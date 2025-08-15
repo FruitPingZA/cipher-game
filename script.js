@@ -1,313 +1,163 @@
-// -----------------------------
-// Cipher Nexus — Nightfall Edition
-// -----------------------------
+// ===== Elements =====
+const els = {
+  audioToggle: document.getElementById('audioToggle'),
+  helpBtn: document.getElementById('helpBtn'),
+  resetBtn: document.getElementById('resetBtn'),
+  helpModal: document.getElementById('helpModal'),
+  helpClose: document.getElementById('helpClose'),
+  helpOk: document.getElementById('helpOk'),
+  winModal: document.getElementById('winModal'),
+  winClose: document.getElementById('winClose'),
+  replayBtn: document.getElementById('replayBtn'),
+  shareBtn: document.getElementById('shareBtn'),
+  levelIndicator: document.getElementById('levelIndicator'),
+  attempts: document.getElementById('attempts'),
+  hintsUsed: document.getElementById('hintsUsed'),
+  levelTitle: document.getElementById('levelTitle'),
+  cipherText: document.getElementById('cipherText'),
+  copyBtn: document.getElementById('copyBtn'),
+  answerInput: document.getElementById('answerInput'),
+  submitBtn: document.getElementById('submitBtn'),
+  hintBtn: document.getElementById('hintBtn'),
+  revealBtn: document.getElementById('revealBtn'),
+  skipBtn: document.getElementById('skipBtn'),
+  prevBtn: document.getElementById('prevBtn'),
+  giveUpBtn: document.getElementById('giveUpBtn'),
+  progressTrack: document.getElementById('progressTrack'),
+  progressDots: document.getElementById('progressDots'),
+  cipherTag: document.getElementById('cipherTag'),
+  feedback: document.getElementById('feedback')
+};
 
-// Globals
+// ===== Audio =====
+let audioOn = false;
+const whisper = new Audio('https://cdn.pixabay.com/audio/2022/03/15/audio_21cfc88df3.mp3');
+whisper.volume = 0.55;
+const windLoop = new Audio('https://cdn.pixabay.com/audio/2021/08/08/audio_0a50c9f3d2.mp3');
+windLoop.loop = true; windLoop.volume = 0.18;
+
+// ===== Cipher data =====
 const levels = [
-  { type: 'Caesar', text: 'KHOOR ZRUOG', key: 3 },
-  { type: 'Atbash', text: 'ZGYV RH Z HVXIVG', key: null },
-  { type: 'Vigenere', text: 'RIJVS UYVJN', key: 'KEY' },
-  { type: 'Morse', text: '.... . .-.. .-.. ---', key: null },
-  { type: 'Transposition', text: 'HLEOL OLWRD', key: '2,4,1,3,5' }
+  {cipher:'Caesar', type:'Shift cipher', text:'KHOOR', answer:'HELLO'},
+  {cipher:'Atbash', type:'Letter substitution', text:'ZOO', answer:'ALL'},
+  {cipher:'Vigenere', type:'Keyword cipher', text:'RIJVS', answer:'HELLO'},
+  {cipher:'Morse', type:'Dots and dashes', text:'.... . .-.. .-.. ---', answer:'HELLO'},
+  {cipher:'Transposition', type:'Scramble letters', text:'OLEHL', answer:'HELLO'}
 ];
 
-let state = {
-  currentLevel: 0,
-  attempts: 0,
-  hintsUsed: 0,
-  revealedIndices: [],
-  audio: false
-};
+let state = { index:0, attempts:0, hints:0 };
 
-// DOM Elements
-const cipherTextEl = document.getElementById('cipherText');
-const answerInput = document.getElementById('answerInput');
-const submitBtn = document.getElementById('submitBtn');
-const feedbackEl = document.getElementById('feedback');
-const hintBtn = document.getElementById('hintBtn');
-const revealBtn = document.getElementById('revealBtn');
-const skipBtn = document.getElementById('skipBtn');
-const levelIndicator = document.getElementById('levelIndicator');
-const levelTitle = document.getElementById('levelTitle');
-const progressTrack = document.getElementById('progressTrack');
-const progressDots = document.getElementById('progressDots');
-const audioToggle = document.getElementById('audioToggle');
-const helpModal = document.getElementById('helpModal');
-const helpBtn = document.getElementById('helpBtn');
-const helpClose = document.getElementById('helpClose');
-const winModal = document.getElementById('winModal');
-const winClose = document.getElementById('winClose');
-const replayBtn = document.getElementById('replayBtn');
-
-// -----------------------------
-// Utility Functions
-// -----------------------------
-function caesarDecode(str, shift) {
-  return str.replace(/[A-Z]/gi, c => {
-    const base = c <= 'Z' ? 65 : 97;
-    return String.fromCharCode((c.charCodeAt(0) - base - shift + 26) % 26 + base);
-  });
-}
-
-function atbashDecode(str) {
-  return str.replace(/[A-Z]/gi, c => {
-    const base = c <= 'Z' ? 65 : 97;
-    return String.fromCharCode(25 - (c.charCodeAt(0) - base) + base);
-  });
-}
-
-function vigenereDecode(str, key) {
-  let decoded = '';
-  let j = 0;
-  key = key.toUpperCase();
-  str = str.toUpperCase();
-  for (let i = 0; i < str.length; i++) {
-    const c = str[i];
-    if (c >= 'A' && c <= 'Z') {
-      const shift = key[j % key.length].charCodeAt(0) - 65;
-      decoded += String.fromCharCode((c.charCodeAt(0) - 65 - shift + 26) % 26 + 65);
-      j++;
-    } else decoded += c;
+// ===== Typewriter effect =====
+function typeWriter(text, callback){
+  els.cipherText.textContent='';
+  let i=0;
+  function step(){
+    if(i<text.length){
+      els.cipherText.textContent+=text[i];
+      i++;
+      setTimeout(step, 70);
+    } else callback && callback();
   }
-  return decoded;
+  step();
 }
 
-const morseMap = {
-  '.-':'A','-...':'B','-.-.':'C','-..':'D','.':'E','..-.':'F','--.':'G','....':'H','..':'I',
-  '.---':'J','-.-':'K','.-..':'L','--':'M','-.':'N','---':'O','.--.':'P','--.-':'Q','.-.':'R',
-  '...':'S','-':'T','..-':'U','...-':'V','.--':'W','-..-':'X','-.--':'Y','--..':'Z','/':' '
-};
-function morseDecode(str) {
-  return str.split(' ').map(s => morseMap[s] || '').join('');
-}
-
-function transpositionDecode(str, key) {
-  const order = key.split(',').map(Number);
-  const n = order.length;
-  const rows = Math.ceil(str.length / n);
-  let cols = Array.from({length:n},()=>[]);
-  let k=0;
-  for(let r=0;r<rows;r++){
-    for(let c=0;c<n;c++){
-      cols[c][r] = str[k++]||'';
-    }
-  }
-  let decoded='';
-  for(let r=0;r<rows;r++){
-    for(let i=0;i<n;i++){
-      decoded += cols[order[i]-1][r]||'';
-    }
-  }
-  return decoded;
-}
-
-function decodeLevel(level) {
-  switch(level.type){
-    case 'Caesar': return caesarDecode(level.text, level.key);
-    case 'Atbash': return atbashDecode(level.text);
-    case 'Vigenere': return vigenereDecode(level.text, level.key);
-    case 'Morse': return morseDecode(level.text);
-    case 'Transposition': return transpositionDecode(level.text, level.key);
-  }
-}
-
-// -----------------------------
-// Display Functions
-// -----------------------------
-function renderCipher() {
-  cipherTextEl.textContent = levels[state.currentLevel].text;
-  cipherTextEl.classList.remove('reveal');
-  levelTitle.textContent = `Level ${state.currentLevel+1} — ${levels[state.currentLevel].type}`;
-  levelIndicator.textContent = `${state.currentLevel+1} / ${levels.length}`;
-  answerInput.value='';
-  feedbackEl.textContent='';
-  state.revealedIndices=[];
+// ===== Init =====
+function renderLevel(){
+  const level = levels[state.index];
+  els.levelIndicator.textContent = `${state.index+1} / ${levels.length}`;
+  els.levelTitle.textContent = `Level ${state.index+1} — ${level.cipher}`;
+  els.cipherTag.title = level.type;
+  els.attempts.textContent = state.attempts;
+  els.hintsUsed.textContent = state.hints;
   updateProgress();
+  typeWriter(level.text);
 }
-
-function updateProgress() {
-  const pct = (state.currentLevel)/levels.length;
-  progressTrack.style.setProperty('--pct', pct);
-  progressDots.innerHTML='';
+function updateProgress(){
+  const pct = (state.index+1)/levels.length;
+  els.progressTrack.style.setProperty('--pct', pct);
+  els.progressDots.innerHTML='';
   for(let i=0;i<levels.length;i++){
-    const dot = document.createElement('span');
-    dot.className='dot'+(i<state.currentLevel?' done': i===state.currentLevel?' active':'');
-    progressDots.appendChild(dot);
+    const dot = document.createElement('div'); dot.classList.add('dot');
+    if(i===state.index) dot.classList.add('active');
+    if(i<state.index) dot.classList.add('done');
+    els.progressDots.appendChild(dot);
   }
 }
 
-// -----------------------------
-// Feedback
-// -----------------------------
-function showFeedback(msg,type='ok'){
-  feedbackEl.textContent=msg;
-  feedbackEl.className='feedback '+type;
-}
-
-// -----------------------------
-// Hint & Reveal
-// -----------------------------
-function hint(){
-  state.hintsUsed++;
-  showFeedback('Hint: Think about the type of cipher.', 'hint');
-  if(state.audio) whisperAudio();
-}
-
-function revealLetter(){
-  const answer = decodeLevel(levels[state.currentLevel]).toUpperCase();
-  let unrevealed = [];
-  for(let i=0;i<answer.length;i++){
-    if(!state.revealedIndices.includes(i) && answer[i]!==' '){
-      unrevealed.push(i);
-    }
-  }
-  if(unrevealed.length===0) return;
-  const idx = unrevealed[Math.floor(Math.random()*unrevealed.length)];
-  state.revealedIndices.push(idx);
-  let current = answerInput.value.toUpperCase().split('');
-  current[idx] = answer[idx];
-  answerInput.value = current.join('');
-  showFeedback('One letter revealed.', 'hint');
-}
-
-// -----------------------------
-// Audio
-// -----------------------------
-function whisperAudio(){
-  const audio = new Audio('https://actions.google.com/sounds/v1/ambiences/whisper.ogg');
-  audio.volume=0.1;
-  audio.play();
-}
-
-// -----------------------------
-// Flashlight
-// -----------------------------
-document.addEventListener('mousemove', e=>{
-  document.querySelector('.flashlight-scope').style.setProperty('--x', `${e.clientX}px`);
-  document.querySelector('.flashlight-scope').style.setProperty('--y', `${e.clientY}px`);
-});
-
-// -----------------------------
-// Submit & Progress
-// -----------------------------
-submitBtn.addEventListener('click',()=>{
+// ===== Actions =====
+els.submitBtn.addEventListener('click',()=>{
+  const answer = els.answerInput.value.trim().toUpperCase();
+  const correct = levels[state.index].answer.toUpperCase();
   state.attempts++;
-  const answer = decodeLevel(levels[state.currentLevel]).toUpperCase();
-  const guess = answerInput.value.toUpperCase().trim();
-  if(guess === answer){
-    showFeedback('Correct!', 'ok');
-    cipherTextEl.classList.add('reveal');
-    state.currentLevel++;
-    if(state.currentLevel>=levels.length){
-      winModal.showModal();
-    }else{
-      setTimeout(renderCipher,800);
-    }
-  }else{
-    showFeedback('Incorrect, try again.', 'err');
-  }
-  localStorage.setItem('cipherState', JSON.stringify(state));
-  document.getElementById('attempts').textContent = state.attempts;
-  document.getElementById('hintsUsed').textContent = state.hintsUsed;
-});
-
-// -----------------------------
-// Skip Level
-// -----------------------------
-skipBtn.addEventListener('click',()=>{
-  state.currentLevel++;
-  if(state.currentLevel>=levels.length){
-    winModal.showModal();
-  }else{
-    renderCipher();
+  els.attempts.textContent = state.attempts;
+  if(answer===correct){
+    els.feedback.textContent='Correct!'; els.feedback.className='feedback ok';
+    setTimeout(nextLevel,700);
+  } else {
+    els.feedback.textContent='Wrong!'; els.feedback.className='feedback err';
   }
 });
-
-// -----------------------------
-// Hints
-// -----------------------------
-hintBtn.addEventListener('click', hint);
-
-// -----------------------------
-// Audio Toggle
-// -----------------------------
-audioToggle.addEventListener('click',()=>{
-  state.audio=!state.audio;
-  audioToggle.textContent= state.audio ? '🔊 Audio On' : '🔇 Audio Off';
-  audioToggle.setAttribute('aria-pressed', state.audio);
-});
-
-// -----------------------------
-// Modal Controls
-// -----------------------------
-helpBtn.addEventListener('click',()=>helpModal.showModal());
-helpClose.addEventListener('click',()=>helpModal.close());
-document.getElementById('helpOk').addEventListener('click',()=>helpModal.close());
-
-winClose.addEventListener('click',()=>winModal.close());
-replayBtn.addEventListener('click',()=>{
-  state.currentLevel=0;
-  state.attempts=0;
-  state.hintsUsed=0;
-  renderCipher();
-  winModal.close();
-});
-
-// -----------------------------
-// Copy Cipher
-// -----------------------------
-document.getElementById('copyBtn').addEventListener('click',()=>{
-  navigator.clipboard.writeText(cipherTextEl.textContent);
-  showFeedback('Cipher copied to clipboard', 'ok');
-});
-
-// -----------------------------
-// Fog Animation
-// -----------------------------
-const fogCanvas = document.getElementById('fog');
-const ctx = fogCanvas.getContext('2d');
-let fogParticles = [];
-function resizeCanvas(){
-  fogCanvas.width=window.innerWidth;
-  fogCanvas.height=window.innerHeight;
+function nextLevel(){
+  if(state.index<levels.length-1){
+    state.index++; renderLevel(); els.answerInput.value=''; els.feedback.textContent='';
+  } else els.winModal.showModal();
 }
-window.addEventListener('resize', resizeCanvas);
-resizeCanvas();
-for(let i=0;i<200;i++){
-  fogParticles.push({
-    x:Math.random()*fogCanvas.width,
-    y:Math.random()*fogCanvas.height,
-    r: Math.random()*3+1,
-    dx: Math.random()*0.2-0.1,
-    dy: Math.random()*0.1+0.05
-  });
+function prevLevel(){
+  if(state.index>0){ state.index--; renderLevel(); els.answerInput.value=''; els.feedback.textContent=''; }
 }
+function hint(){
+  state.hints++; els.hintsUsed.textContent=state.hints;
+  const ans=levels[state.index].answer;
+  const hintChar=ans[Math.floor(Math.random()*ans.length)];
+  els.feedback.textContent=`Hint: contains "${hintChar}"`; els.feedback.className='feedback hint';
+  if(audioOn) whisper.play();
+}
+function reveal(){
+  els.answerInput.value=levels[state.index].answer;
+  els.feedback.textContent='Partial reveal'; els.feedback.className='feedback hint';
+}
+function giveUp(){
+  els.answerInput.value=levels[state.index].answer;
+  els.feedback.textContent='Answer revealed'; els.feedback.className='feedback hint';
+}
+
+// ===== Event Listeners =====
+els.prevBtn.addEventListener('click',prevLevel);
+els.hintBtn.addEventListener('click',hint);
+els.revealBtn.addEventListener('click',reveal);
+els.giveUpBtn.addEventListener('click',giveUp);
+els.skipBtn.addEventListener('click',nextLevel);
+els.copyBtn.addEventListener('click',()=>navigator.clipboard.writeText(els.cipherText.textContent));
+els.resetBtn.addEventListener('click',()=>{
+  state.index=0; state.attempts=0; state.hints=0; renderLevel(); els.answerInput.value=''; els.feedback.textContent='';
+});
+els.audioToggle.addEventListener('click',()=>{
+  audioOn=!audioOn;
+  els.audioToggle.textContent=audioOn?'🔊 Audio On':'🔇 Audio Off';
+  els.audioToggle.setAttribute('aria-pressed',audioOn);
+  if(audioOn) windLoop.play(); else windLoop.pause();
+});
+els.helpBtn.addEventListener('click',()=>els.helpModal.showModal());
+els.helpClose.addEventListener('click',()=>els.helpModal.close());
+els.helpOk.addEventListener('click',()=>els.helpModal.close());
+els.winClose.addEventListener('click',()=>els.winModal.close());
+els.replayBtn.addEventListener('click',()=>{
+  state.index=0; state.attempts=0; state.hints=0; renderLevel(); els.winModal.close(); els.answerInput.value=''; els.feedback.textContent='';
+});
+els.shareBtn.addEventListener('click',()=>navigator.clipboard.writeText(window.location.href));
+
+// Hover tooltip
+els.cipherTag.addEventListener('mouseenter',()=>els.cipherTag.title=levels[state.index].type);
+
+// ===== Init =====
+renderLevel();
+
+// ===== Fog animation =====
+const fogEl = document.getElementById('fog');
+let fogOffset=0;
 function animateFog(){
-  ctx.clearRect(0,0,fogCanvas.width,fogCanvas.height);
-  ctx.fillStyle='rgba(255,255,255,0.03)';
-  fogParticles.forEach(p=>{
-    p.x+=p.dx;
-    p.y+=p.dy;
-    if(p.x>fogCanvas.width)p.x=0;
-    if(p.y>fogCanvas.height)p.y=0;
-    ctx.beginPath();
-    ctx.arc(p.x,p.y,p.r,0,Math.PI*2);
-    ctx.fill();
-  });
+  fogOffset+=0.05;
+  fogEl.style.backgroundPosition=`${fogOffset}px ${fogOffset/2}px`;
   requestAnimationFrame(animateFog);
 }
 animateFog();
-
-// -----------------------------
-// Initialization
-// -----------------------------
-function loadState(){
-  const saved = localStorage.getItem('cipherState');
-  if(saved){
-    state = JSON.parse(saved);
-  }
-}
-loadState();
-renderCipher();
-document.getElementById('attempts').textContent = state.attempts;
-document.getElementById('hintsUsed').textContent = state.hintsUsed;
