@@ -36,131 +36,109 @@ whisper.volume = 0.55;
 const windLoop = new Audio('https://cdn.pixabay.com/audio/2021/08/08/audio_0a50c9f3d2.mp3');
 windLoop.loop = true; windLoop.volume = 0.18;
 
-// ===== Word Bank =====
-const WORDS = [
-  "UNICORN FARTS","BANANA PHONE","PIZZA CAT","SPAGHETTI MONSTER","ZOMBIE NINJA",
-  "LASER PENGUIN","TOILET PAPER KING","SLEEPY DRAGON","CUPCAKE WARRIOR","BUBBLE WRAP",
-  "DANCING LLAMA","FARTING CLOWN","GIGGLING TURTLE","HICCUPING VAMPIRE","MOON WALKER"
+// ===== Generate random funny phrases =====
+const funnyPhrases = [
+  "BANANA SPLIT", "PINEAPPLE PIZZA", "UNICORN TEARS", "SPOOKY CAT", "LEFTOVER PIZZA",
+  "DANCE PARTY", "NAPPING KOALA", "JELLYFISH JAM", "TACO TUESDAY", "CHEESEBURGER",
+  "RAINBOW LASER", "TOASTY MARSHMALLOW", "CUPCAKE WIZARD", "CRAZY CUCUMBER", "GINGER NINJA",
+  "BUBBLE TROUBLE", "WOBBLY WOBBLES", "HAPPY PANDA", "CANDY RAIN", "SLEEPY TURTLE"
 ];
 
-// ===== Cipher functions =====
-function caesarEncrypt(str, shift=3){
-  return str.toUpperCase().replace(/[A-Z]/g, c=>String.fromCharCode((c.charCodeAt(0)-65+shift)%26+65));
-}
-function atbashEncrypt(str){
-  return str.toUpperCase().replace(/[A-Z]/g, c=>String.fromCharCode(90-(c.charCodeAt(0)-65)));
-}
-function vigenereEncrypt(str,key="KEY"){
-  str=str.toUpperCase(); key=key.toUpperCase();
-  let res=""; let ki=0;
-  for(let c of str){
-    if(c>='A' && c<='Z'){
-      let shift=key[ki%key.length].charCodeAt(0)-65;
-      res+=String.fromCharCode((c.charCodeAt(0)-65+shift)%26+65);
-      ki++;
-    } else res+=c;
-  }
-  return res;
-}
-function morseEncrypt(str){
-  const MORSE = {
-    'A':'.-','B':'-...','C':'-.-.','D':'-..','E':'.','F':'..-.','G':'--.',
-    'H':'....','I':'..','J':'.---','K':'-.-','L':'.-..','M':'--','N':'-.',
-    'O':'---','P':'.--.','Q':'--.-','R':'.-.','S':'...','T':'-','U':'..-',
-    'V':'...-','W':'.--','X':'-..-','Y':'-.--','Z':'--..',' ':'/'
-  };
-  return str.toUpperCase().split('').map(c=>MORSE[c]||c).join(' ');
-}
-function transpositionEncrypt(str){
-  let arr=str.split('');
-  for(let i=0;i<arr.length-1;i+=2){
-    if(arr[i]!==' ' && arr[i+1]!==' ') [arr[i],arr[i+1]]=[arr[i+1],arr[i]];
-  }
-  return arr.join('');
+function getRandomPhrase() {
+  return funnyPhrases[Math.floor(Math.random() * funnyPhrases.length)];
 }
 
-// ===== Level generator =====
-function generateRandomLevels(count=5){
-  const levels=[];
-  const ciphers=[
-    {name:'Caesar',func:caesarEncrypt,type:'Shift cipher',explanation:'Each letter is shifted by a fixed number down the alphabet.'},
-    {name:'Atbash',func:atbashEncrypt,type:'Letter substitution',explanation:'Each letter is replaced by its reverse in the alphabet (A→Z, B→Y).'},
-    {name:'Vigenere',func:(txt)=>vigenereEncrypt(txt,'FUN'),type:'Keyword cipher',explanation:'Uses a keyword to shift letters differently across the message.'},
-    {name:'Morse',func:morseEncrypt,type:'Dots and dashes',explanation:'Represents letters using dots (.) and dashes (-).'},
-    {name:'Transposition',func:transpositionEncrypt,type:'Scramble letters',explanation:'Letters are rearranged according to a fixed pattern.'}
+// ===== Cipher data =====
+let levels = [];
+function generateLevels(count=5){
+  const ciphers = [
+    {cipher:'Caesar', type:'Shift cipher', explanation:'Each letter is shifted by a fixed number down the alphabet.'},
+    {cipher:'Atbash', type:'Letter substitution', explanation:'Each letter is replaced by its reverse in the alphabet (A→Z, B→Y).'},
+    {cipher:'Vigenere', type:'Keyword cipher', explanation:'Uses a keyword to shift letters differently across the message.'},
+    {cipher:'Morse', type:'Dots and dashes', explanation:'Represents letters using dots (.) and dashes (-).'},
+    {cipher:'Transposition', type:'Scramble letters', explanation:'Letters are rearranged according to a fixed pattern.'}
   ];
-  const usedWords = new Set();
-  while(levels.length<count){
-    let word=WORDS[Math.floor(Math.random()*WORDS.length)];
-    if(usedWords.has(word)) continue;
-    usedWords.add(word);
-    const cipher=ciphers[Math.floor(Math.random()*ciphers.length)];
-    levels.push({
-      cipher:cipher.name,
-      type:cipher.type,
-      explanation:cipher.explanation,
-      text:cipher.func(word),
-      answer:word.toUpperCase()
+
+  const newLevels = [];
+  for(let i=0;i<count;i++){
+    const phrase = getRandomPhrase();
+    const cipher = ciphers[Math.floor(Math.random()*ciphers.length)];
+    newLevels.push({
+      cipher: cipher.cipher,
+      type: cipher.type,
+      explanation: cipher.explanation,
+      text: phrase,
+      answer: phrase,
+      givenUp: false,
+      failed: false
     });
   }
-  return levels;
+  return newLevels;
 }
 
-let levels = generateRandomLevels(5);
+// ===== Shuffle array =====
+function shuffleArray(array){
+  for(let i=array.length-1;i>0;i--){
+    const j=Math.floor(Math.random()*(i+1));
+    [array[i], array[j]]=[array[j], array[i]];
+  }
+  return array;
+}
 
 // ===== State =====
-let state = { index:0, attempts:0, hints:0, givenUp:false, correct:0, failed:0 };
+let state = { index:0, attempts:0, hints:0, correct:0, failed:0 };
 
 // ===== Typewriter effect =====
-function typeWriter(text,callback){
+function typeWriter(text, callback){
   els.cipherText.textContent='';
   let i=0;
   function step(){
     if(i<text.length){
       els.cipherText.textContent+=text[i];
       i++;
-      setTimeout(step,70);
+      setTimeout(step, 70);
     } else callback && callback();
   }
   step();
 }
 
-// ===== Render level =====
+// ===== Render =====
 function renderLevel(){
-  const level=levels[state.index];
-  els.levelIndicator.textContent=`${state.index+1} / ${levels.length}`;
-  els.levelTitle.textContent=`Level ${state.index+1} — ${level.cipher}`;
-  els.cipherTag.title=`${level.type}: ${level.explanation}`;
-  els.attempts.textContent=state.attempts;
-  els.hintsUsed.textContent=state.hints;
-  els.answerInput.disabled=state.givenUp;
+  const level = levels[state.index];
+  els.levelIndicator.textContent = `${state.index+1} / ${levels.length}`;
+  els.levelTitle.textContent = `Level ${state.index+1} — ${level.cipher}`;
+  els.cipherTag.title = `${level.type}: ${level.explanation}`;
+  els.attempts.textContent = state.attempts;
+  els.hintsUsed.textContent = state.hints;
+  els.answerInput.value='';
+  els.answerInput.disabled = level.givenUp;
   els.feedback.textContent='';
   typeWriter(level.text);
   updateProgress();
 }
 
+// ===== Update Progress =====
 function updateProgress(){
-  const pct=(state.correct+state.failed)/levels.length;
-  els.progressTrack.style.setProperty('--pct',pct);
+  const pct = (state.correct + state.failed)/levels.length;
+  els.progressTrack.style.setProperty('--pct', pct);
   els.progressDots.innerHTML='';
   for(let i=0;i<levels.length;i++){
-    const dot=document.createElement('div'); dot.classList.add('dot');
+    const dot = document.createElement('div'); dot.classList.add('dot');
     if(i===state.index) dot.classList.add('active');
-    if(i<state.index){
-      if(levels[i].locked) dot.classList.add('done');
-    }
+    if(levels[i].givenUp || levels[i].failed) dot.classList.add('done');
     els.progressDots.appendChild(dot);
   }
 }
 
 // ===== Actions =====
 els.submitBtn.addEventListener('click',()=>{
-  if(state.givenUp) return;
-  const answer=els.answerInput.value.trim().toUpperCase();
-  const correct=levels[state.index].answer;
+  const level = levels[state.index];
+  if(level.givenUp) return;
+  const answer = els.answerInput.value.trim().toUpperCase();
+  const correct = level.answer.toUpperCase();
   state.attempts++;
-  els.attempts.textContent=state.attempts;
-  if(answer===correct){
+  els.attempts.textContent = state.attempts;
+  if(answer === correct){
     els.feedback.textContent='Correct!'; els.feedback.className='feedback ok';
     state.correct++;
     setTimeout(nextLevel,700);
@@ -170,26 +148,23 @@ els.submitBtn.addEventListener('click',()=>{
 });
 
 function nextLevel(){
-  if(state.index<levels.length-1){
+  if(state.index < levels.length-1){
     state.index++;
-    state.givenUp=false;
     renderLevel();
-    els.answerInput.value='';
-  } else endGame();
+  } else {
+    showWinModal();
+  }
 }
 
 function prevLevel(){
   if(state.index>0){
     state.index--;
-    state.givenUp=levels[state.index].locked||false;
     renderLevel();
-    els.answerInput.value='';
   }
 }
 
 function hint(){
-  state.hints++;
-  els.hintsUsed.textContent=state.hints;
+  state.hints++; els.hintsUsed.textContent=state.hints;
   const ans=levels[state.index].answer;
   const hintChar=ans[Math.floor(Math.random()*ans.length)];
   els.feedback.textContent=`Hint: contains "${hintChar}"`; els.feedback.className='feedback hint';
@@ -197,38 +172,59 @@ function hint(){
 }
 
 function reveal(){
-  const ans=levels[state.index].answer;
+  const level = levels[state.index];
+  if(level.givenUp) return;
+  const ans=level.answer;
   let current=els.answerInput.value.toUpperCase();
   for(let i=0;i<ans.length;i++){
-    if(!current[i] || current[i]!==(ans[i])){
-      els.answerInput.value=current.substring(0,i)+ans[i]+current.substring(i+1);
+    if(!current[i]) {
+      current = current.slice(0,i) + ans[i] + current.slice(i+1);
       break;
     }
   }
+  els.answerInput.value=current;
   els.feedback.textContent='Partial reveal'; els.feedback.className='feedback hint';
 }
 
 function giveUp(){
-  state.givenUp=true;
-  levels[state.index].locked=true;
-  els.answerInput.value=levels[state.index].answer;
-  els.answerInput.disabled=true;
+  const level = levels[state.index];
+  level.givenUp = true;
+  level.failed = true;
   state.failed++;
-  els.feedback.textContent='Answer revealed — Locked'; els.feedback.className='feedback hint';
+  els.answerInput.value = level.answer;
+  els.answerInput.disabled = true;
+  els.feedback.textContent='You gave up!'; els.feedback.className='feedback err';
+  updateProgress();
 }
 
-function endGame(){
+function showWinModal(){
+  els.winModal.innerHTML = `
+  <div class="modal-card">
+    <header class="modal-header">
+      <h3>Game Over</h3>
+    </header>
+    <div class="modal-body">
+      <p>Results: ${state.correct} / ${levels.length} correct, ${state.failed} failed.</p>
+    </div>
+    <footer class="modal-footer">
+      <button class="btn primary" id="restartBtn">Restart</button>
+    </footer>
+  </div>
+  `;
   els.winModal.showModal();
+  document.getElementById('restartBtn').addEventListener('click',()=>location.reload());
 }
 
-// ===== Event listeners =====
+// ===== Event Listeners =====
 els.prevBtn.addEventListener('click',prevLevel);
 els.hintBtn.addEventListener('click',hint);
 els.revealBtn.addEventListener('click',reveal);
 els.giveUpBtn.addEventListener('click',giveUp);
 els.skipBtn.addEventListener('click',nextLevel);
 els.copyBtn.addEventListener('click',()=>navigator.clipboard.writeText(els.cipherText.textContent));
-els.resetBtn.addEventListener('click',()=>location.reload());
+els.resetBtn.addEventListener('click',()=>{
+  location.reload();
+});
 els.audioToggle.addEventListener('click',()=>{
   audioOn=!audioOn;
   els.audioToggle.textContent=audioOn?'🔊 Audio On':'🔇 Audio Off';
@@ -239,11 +235,21 @@ els.helpBtn.addEventListener('click',()=>els.helpModal.showModal());
 els.helpClose.addEventListener('click',()=>els.helpModal.close());
 els.helpOk.addEventListener('click',()=>els.helpModal.close());
 els.winClose.addEventListener('click',()=>els.winModal.close());
-els.replayBtn.addEventListener('click',()=>location.reload());
 els.shareBtn.addEventListener('click',()=>navigator.clipboard.writeText(window.location.href));
 
-// Hover tooltip instantly shows
-els.cipherTag.addEventListener('mouseenter',()=>els.cipherTag.title=levels[state.index].type + ': ' + levels[state.index].explanation);
+// Hover tooltip instant
+els.cipherTag.addEventListener('mouseenter',()=>els.cipherTag.title = levels[state.index].type + ': ' + levels[state.index].explanation);
 
 // ===== Init =====
+levels = shuffleArray(generateLevels(5));
 renderLevel();
+
+// ===== Fog animation =====
+const fogEl = document.getElementById('fog');
+let fogOffset=0;
+function animateFog(){
+  fogOffset+=0.05;
+  fogEl.style.backgroundPosition=`${fogOffset}px ${fogOffset/2}px`;
+  requestAnimationFrame(animateFog);
+}
+animateFog();
