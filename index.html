@@ -1,66 +1,131 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Cipher Challenge</title>
-<link href="https://fonts.googleapis.com/css2?family=Special+Elite&family=Spectral:wght@400;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css">
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Cipher Nexus — Nightfall Edition</title>
+  <!-- Fonts: typewriter + serif -->
+  <link href="https://fonts.googleapis.com/css2?family=Special+Elite&family=Spectral:wght@400;600;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-<img id="bg-image" src="https://images.unsplash.com/photo-1608889173456-4d5040b8880c?auto=format&fit=crop&w=1920&q=80" alt="Background">
-<div id="grain"></div>
-<div id="vignette"></div>
-<canvas id="fog"></canvas>
+  <!-- Atmospheric layers -->
+  <img id="bg-image" alt="" src="https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=1920&q=80" />
+  <canvas id="fog" aria-hidden="true"></canvas>
+  <div id="vignette" aria-hidden="true"></div>
+  <div id="grain" aria-hidden="true"></div>
 
-<div class="app">
-  <div class="topbar">
-    <div class="brand">
-      <h1 class="title"><span class="title-line">Cipher</span> <span class="title-line accent">Challenge</span></h1>
-      <div class="sub">Test your cryptography skills</div>
-    </div>
-    <div class="controls">
-      <button class="btn primary" id="prevBtn">Previous</button>
-      <button class="btn primary" id="giveUpBtn">Give Up</button>
-      <button class="btn" id="helpBtn">Help</button>
-    </div>
+  <div id="app" class="app">
+    <header class="topbar">
+      <div class="brand">
+        <h1 class="title" aria-label="Cipher Nexus Nightfall Edition">
+          <span class="title-line">CIPHER</span>
+          <span class="title-line accent">NEXUS</span>
+        </h1>
+        <div class="sub">Nightfall Edition</div>
+      </div>
+      <nav class="controls" aria-label="Game Controls">
+        <button id="audioToggle" class="btn ghost" aria-pressed="false" aria-label="Toggle audio hints (off by default)">🔇 Audio Off</button>
+        <button id="helpBtn" class="btn ghost" aria-haspopup="dialog" aria-controls="helpModal">❓ Help</button>
+        <button id="resetBtn" class="btn ghost">↺ Reset</button>
+      </nav>
+    </header>
+
+    <main class="content">
+      <section class="hud">
+        <div class="hud-item">
+          <span class="hud-label">Level</span>
+          <span id="levelIndicator" class="hud-value">1 / 5</span>
+        </div>
+        <div class="hud-item">
+          <span class="hud-label">Attempts</span>
+          <span id="attempts" class="hud-value">0</span>
+        </div>
+        <div class="hud-item">
+          <span class="hud-label">Hints Used</span>
+          <span id="hintsUsed" class="hud-value">0</span>
+        </div>
+      </section>
+
+      <section class="card flashlight-scope">
+        <div class="card-header">
+          <h2 id="levelTitle" class="level-title" title="">Level 1 — Caesar Shift</h2>
+          <div class="tag" id="cipherTag">Cipher</div>
+        </div>
+
+        <div class="cipher-wrap">
+          <p id="cipherText" class="cipher-text" aria-live="polite" aria-atomic="true"></p>
+          <button id="copyBtn" class="btn slim" title="Copy cipher text">Copy</button>
+        </div>
+
+        <div class="input-wrap">
+          <input id="answerInput" class="input" type="text" placeholder="Type your answer…" autocomplete="off" aria-label="Your decoded answer" />
+          <button id="submitBtn" class="btn primary">Submit</button>
+        </div>
+
+        <div class="feedback" role="status" aria-live="polite" id="feedback"></div>
+
+        <div class="actions">
+          <button id="prevBtn" class="btn ghost" title="Go to previous level">⬅ Previous</button>
+          <button id="hintBtn" class="btn">💡 Hint</button>
+          <button id="revealBtn" class="btn ghost">👁 Reveal One Letter</button>
+          <button id="skipBtn" class="btn ghost" title="Skip this level (no penalty)">⤼ Skip</button>
+          <button id="giveUpBtn" class="btn ghost" title="Give up on this level and reveal the answer">💀 Give Up</button>
+        </div>
+      </section>
+
+      <section class="progress">
+        <div id="progressTrack" class="progress-track" aria-hidden="true"></div>
+        <div id="progressDots" class="progress-dots" aria-label="Level progress"></div>
+      </section>
+    </main>
+
+    <footer class="footer">Cipher Nexus — Nightfall Edition</footer>
   </div>
 
-  <div class="content">
-    <div class="card flashlight-scope">
-      <div class="card-header">
-        <h2 class="level-title" id="cipherName"></h2>
-        <span class="tag" id="cipherHint"></span>
+  <!-- Help Modal -->
+  <dialog id="helpModal" class="modal">
+    <div class="modal-card">
+      <header class="modal-header">
+        <h3>How to Play</h3>
+        <button class="btn ghost close" id="helpClose" aria-label="Close help">✕</button>
+      </header>
+      <div class="modal-body">
+        <ul class="help-list">
+          <li><strong>Goal:</strong> Decode the message each level hides.</li>
+          <li><strong>Types:</strong> Caesar, Atbash, Vigenère, Morse, Transposition.</li>
+          <li><strong>Hints:</strong> Click <em>Hint</em> for a textual nudge; with audio ON you’ll hear a whisper.</li>
+          <li><strong>Reveal:</strong> <em>Reveal One Letter</em> fills a correct character.</li>
+          <li><strong>Skip:</strong> You can skip and come back later.</li>
+          <li><strong>Previous:</strong> Go back to earlier levels if you want.</li>
+          <li><strong>Give Up:</strong> Reveals the answer for the current level.</li>
+          <li><strong>Save:</strong> Progress auto-saves in your browser.</li>
+        </ul>
       </div>
-      <div class="cipher-wrap">
-        <pre class="cipher-text" id="cipherText"></pre>
-      </div>
-      <div class="input-wrap">
-        <input type="text" class="input" id="userInput" placeholder="Enter your solution">
-        <button class="btn primary" id="submitBtn">Submit</button>
-      </div>
-      <div class="feedback" id="feedback"></div>
+      <footer class="modal-footer">
+        <button class="btn primary" id="helpOk">Got it</button>
+      </footer>
     </div>
-  </div>
-</div>
+  </dialog>
 
-<div class="modal" id="helpModal">
-  <div class="modal-card">
-    <div class="modal-header">
-      <h3>Help</h3>
-      <button class="close btn" id="closeHelp">X</button>
+  <!-- Win Modal -->
+  <dialog id="winModal" class="modal">
+    <div class="modal-card">
+      <header class="modal-header">
+        <h3>All Levels Complete!</h3>
+        <button class="btn ghost close" id="winClose" aria-label="Close">✕</button>
+      </header>
+      <div class="modal-body">
+        <p>Bravo, codebreaker. Night yields to dawn.</p>
+        <p class="mono small">Tip: Refresh to replay or share the link to challenge a friend.</p>
+      </div>
+      <footer class="modal-footer">
+        <button class="btn" id="replayBtn">Replay</button>
+        <button class="btn primary" id="shareBtn">Share</button>
+      </footer>
     </div>
-    <div class="modal-body">
-      <ul class="help-list">
-        <li>Try decoding each cipher to progress.</li>
-        <li>Use 'Previous' to revisit questions.</li>
-        <li>'Give Up' reveals the answer for the current cipher.</li>
-        <li>Hover over the cipher name to see what type it is.</li>
-      </ul>
-    </div>
-  </div>
-</div>
+  </dialog>
 
-<script src="main.js"></script>
+  <script src="script.js" defer></script>
 </body>
 </html>
