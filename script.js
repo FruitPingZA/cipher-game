@@ -56,7 +56,11 @@ function shuffleArray(array){
 levels = shuffleArray(levels);
 
 // ===== State =====
-let state = { index:0, attempts:0, hints:0, usedIndexes: new Set() };
+let state = { attempts:0, hints:0, usedIndexes: new Set() };
+
+// ===== Pick first random index =====
+state.index = Math.floor(Math.random() * levels.length);
+state.usedIndexes.add(state.index);
 
 // ===== Typewriter effect =====
 function typeWriter(text, callback){
@@ -179,7 +183,6 @@ els.shareBtn.addEventListener('click',()=>navigator.clipboard.writeText(window.l
 els.cipherTag.addEventListener('mouseenter',()=>els.cipherTag.title=levels[state.index].type + ': ' + levels[state.index].explanation);
 
 // ===== Init =====
-state.usedIndexes.add(state.index);
 renderLevel();
 
 // ===== Fog animation =====
