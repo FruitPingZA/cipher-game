@@ -38,11 +38,11 @@ windLoop.loop = true; windLoop.volume = 0.18;
 
 // ===== Cipher data =====
 const levels = [
-  {cipher:'Caesar', type:'Shift cipher', text:'KHOOR', answer:'HELLO'},
-  {cipher:'Atbash', type:'Letter substitution', text:'ZOO', answer:'ALL'},
-  {cipher:'Vigenere', type:'Keyword cipher', text:'RIJVS', answer:'HELLO'},
-  {cipher:'Morse', type:'Dots and dashes', text:'.... . .-.. .-.. ---', answer:'HELLO'},
-  {cipher:'Transposition', type:'Scramble letters', text:'OLEHL', answer:'HELLO'}
+  {cipher:'Caesar', type:'Shift cipher', description:'Each letter is shifted a fixed number of places. Solve by trying shifts or using frequency analysis.', text:'KHOOR', answer:'HELLO'},
+  {cipher:'Atbash', type:'Letter substitution', description:'Each letter is replaced with its opposite in the alphabet. Solve by reversing letters.', text:'ZOO', answer:'ALL'},
+  {cipher:'Vigenere', type:'Keyword cipher', description:'Uses a keyword to shift letters differently for each position. Solve by finding the keyword or using frequency patterns.', text:'RIJVS', answer:'HELLO'},
+  {cipher:'Morse', type:'Dots and dashes', description:'Dots and dashes represent letters. Solve by translating each symbol.', text:'.... . .-.. .-.. ---', answer:'HELLO'},
+  {cipher:'Transposition', type:'Scramble letters', description:'Letters are rearranged. Solve by reordering them logically or by pattern.', text:'OLEHL', answer:'HELLO'}
 ];
 
 let state = { index:0, attempts:0, hints:0 };
@@ -66,7 +66,7 @@ function renderLevel(){
   const level = levels[state.index];
   els.levelIndicator.textContent = `${state.index+1} / ${levels.length}`;
   els.levelTitle.textContent = `Level ${state.index+1} — ${level.cipher}`;
-  els.cipherTag.title = level.type;
+  els.cipherTag.textContent = level.cipher;
   els.attempts.textContent = state.attempts;
   els.hintsUsed.textContent = state.hints;
   updateProgress();
@@ -146,8 +146,42 @@ els.replayBtn.addEventListener('click',()=>{
 });
 els.shareBtn.addEventListener('click',()=>navigator.clipboard.writeText(window.location.href));
 
-// Hover tooltip
-els.cipherTag.addEventListener('mouseenter',()=>els.cipherTag.title=levels[state.index].type);
+// ===== Custom Cipher Tooltip =====
+const tooltip = document.createElement('div');
+tooltip.classList.add('cipher-tooltip');
+tooltip.style.position = 'absolute';
+tooltip.style.background = 'rgba(10,14,22,0.9)';
+tooltip.style.color = '#e7ecff';
+tooltip.style.padding = '10px 14px';
+tooltip.style.borderRadius = '12px';
+tooltip.style.border = '1px solid #1a2230';
+tooltip.style.boxShadow = '0 8px 20px rgba(0,0,0,0.5)';
+tooltip.style.pointerEvents = 'none';
+tooltip.style.opacity = 0;
+tooltip.style.transition = 'opacity 0.25s ease, transform 0.25s ease';
+tooltip.style.whiteSpace = 'pre-wrap';
+tooltip.style.zIndex = 9999;
+document.body.appendChild(tooltip);
+
+els.cipherTag.addEventListener('mouseenter', (e) => {
+  const level = levels[state.index];
+  tooltip.textContent = `${level.cipher} — ${level.type}\nTip: ${level.description}`;
+  const rect = els.cipherTag.getBoundingClientRect();
+  tooltip.style.left = `${rect.right + 12}px`;
+  tooltip.style.top = `${rect.top}px`;
+  tooltip.style.opacity = 1;
+  tooltip.style.transform = 'translateY(0)';
+});
+
+els.cipherTag.addEventListener('mousemove', (e) => {
+  tooltip.style.left = `${e.clientX + 12}px`;
+  tooltip.style.top = `${e.clientY + 12}px`;
+});
+
+els.cipherTag.addEventListener('mouseleave', () => {
+  tooltip.style.opacity = 0;
+  tooltip.style.transform = 'translateY(-10px)';
+});
 
 // ===== Init =====
 renderLevel();
