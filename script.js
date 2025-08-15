@@ -37,27 +37,26 @@ const windLoop = new Audio('https://cdn.pixabay.com/audio/2021/08/08/audio_0a50c
 windLoop.loop = true; windLoop.volume = 0.18;
 
 // ===== Cipher data =====
-const levels = [
-  {cipher:'Caesar', type:'Shift cipher', text:'KHOOR', answer:'HELLO', info:'A Caesar cipher shifts each letter by a fixed number. Solve by shifting letters back by the key.'},
-  {cipher:'Atbash', type:'Letter substitution', text:'ZOO', answer:'ALL', info:'Atbash substitutes each letter with its reverse (A↔Z, B↔Y). Decode by reversing substitution.'},
-  {cipher:'Vigenere', type:'Keyword cipher', text:'RIJVS', answer:'HELLO', info:'Vigenère uses a keyword to shift letters. Solve by repeating the key and reversing shifts.'},
-  {cipher:'Morse', type:'Dots and dashes', text:'.... . .-.. .-.. ---', answer:'HELLO', info:'Morse code uses dots and dashes for letters. Translate each Morse symbol to letters.'},
-  {cipher:'Transposition', type:'Scramble letters', text:'OLEHL', answer:'HELLO', info:'Transposition ciphers scramble letters. Solve by rearranging letters to form words.'}
+let levels = [
+  {cipher:'Caesar', type:'Shift cipher', explanation:'Each letter is shifted by a fixed number down the alphabet.', text:'KHOOR', answer:'HELLO'},
+  {cipher:'Atbash', type:'Letter substitution', explanation:'Each letter is replaced by its reverse in the alphabet (A→Z, B→Y).', text:'ZOO', answer:'ALL'},
+  {cipher:'Vigenere', type:'Keyword cipher', explanation:'Uses a keyword to shift letters differently across the message.', text:'RIJVS', answer:'HELLO'},
+  {cipher:'Morse', type:'Dots and dashes', explanation:'Represents letters using dots (.) and dashes (-).', text:'.... . .-.. .-.. ---', answer:'HELLO'},
+  {cipher:'Transposition', type:'Scramble letters', explanation:'Letters are rearranged according to a fixed pattern.', text:'OLEHL', answer:'HELLO'}
 ];
 
-// ===== Shuffle levels =====
-function shuffleArray(arr){
-  const copy = [...arr];
-  for(let i=copy.length-1;i>0;i--){
+// ===== Shuffle levels to start differently each session =====
+function shuffleArray(array){
+  for(let i=array.length-1;i>0;i--){
     const j=Math.floor(Math.random()*(i+1));
-    [copy[i],copy[j]]=[copy[j],copy[i]];
+    [array[i], array[j]]=[array[j], array[i]];
   }
-  return copy;
+  return array;
 }
-let shuffledLevels = shuffleArray(levels);
+levels = shuffleArray(levels);
 
 // ===== State =====
-let state = { index:0, attempts:0, hints:0 };
+let state = { index:0, attempts:0, hints:0, usedIndexes: new Set() };
 
 // ===== Typewriter effect =====
 function typeWriter(text, callback){
@@ -67,73 +66,42 @@ function typeWriter(text, callback){
     if(i<text.length){
       els.cipherText.textContent+=text[i];
       i++;
-      setTimeout(step,70);
+      setTimeout(step, 70);
     } else callback && callback();
   }
   step();
 }
 
-// ===== Render Level =====
+// ===== Init =====
 function renderLevel(){
-  const level = shuffledLevels[state.index];
-  els.levelIndicator.textContent = `${state.index+1} / ${shuffledLevels.length}`;
+  const level = levels[state.index];
+  els.levelIndicator.textContent = `${state.index+1} / ${levels.length}`;
   els.levelTitle.textContent = `Level ${state.index+1} — ${level.cipher}`;
-  els.cipherTag.title = `${level.type}: ${level.info}`;
+  els.cipherTag.title = `${level.type}: ${level.explanation}`;
   els.attempts.textContent = state.attempts;
   els.hintsUsed.textContent = state.hints;
   updateProgress();
   typeWriter(level.text);
 }
 
-// ===== Progress =====
 function updateProgress(){
-  const pct = (state.index+1)/shuffledLevels.length;
+  const pct = (state.index+1)/levels.length;
   els.progressTrack.style.setProperty('--pct', pct);
   els.progressDots.innerHTML='';
-  for(let i=0;i<shuffledLevels.length;i++){
-    const dot=document.createElement('div'); dot.classList.add('dot');
+  for(let i=0;i<levels.length;i++){
+    const dot = document.createElement('div'); dot.classList.add('dot');
     if(i===state.index) dot.classList.add('active');
     if(i<state.index) dot.classList.add('done');
     els.progressDots.appendChild(dot);
   }
 }
 
-// ===== Navigation =====
-function nextLevel(){
-  if(state.index<shuffledLevels.length-1){
-    state.index++; renderLevel(); els.answerInput.value=''; els.feedback.textContent='';
-  } else els.winModal.showModal();
-}
-
-function prevLevel(){
-  if(state.index>0){ state.index--; renderLevel(); els.answerInput.value=''; els.feedback.textContent=''; }
-}
-
 // ===== Actions =====
-function hint(){
-  state.hints++; els.hintsUsed.textContent=state.hints;
-  const ans=shuffledLevels[state.index].answer;
-  const hintChar=ans[Math.floor(Math.random()*ans.length)];
-  els.feedback.textContent=`Hint: contains "${hintChar}"`; els.feedback.className='feedback hint';
-  if(audioOn) whisper.play();
-}
-
-function reveal(){
-  els.answerInput.value=shuffledLevels[state.index].answer;
-  els.feedback.textContent='Partial reveal'; els.feedback.className='feedback hint';
-}
-
-function giveUp(){
-  els.answerInput.value=shuffledLevels[state.index].answer;
-  els.feedback.textContent='Answer revealed'; els.feedback.className='feedback hint';
-}
-
-// ===== Event Listeners =====
 els.submitBtn.addEventListener('click',()=>{
-  const answer=els.answerInput.value.trim().toUpperCase();
-  const correct=shuffledLevels[state.index].answer.toUpperCase();
+  const answer = els.answerInput.value.trim().toUpperCase();
+  const correct = levels[state.index].answer.toUpperCase();
   state.attempts++;
-  els.attempts.textContent=state.attempts;
+  els.attempts.textContent = state.attempts;
   if(answer===correct){
     els.feedback.textContent='Correct!'; els.feedback.className='feedback ok';
     setTimeout(nextLevel,700);
@@ -142,45 +110,76 @@ els.submitBtn.addEventListener('click',()=>{
   }
 });
 
+function nextLevel(){
+  if(state.index<levels.length-1){
+    state.index++;
+    while(state.usedIndexes.has(state.index) && state.index<levels.length-1) state.index++;
+    state.usedIndexes.add(state.index);
+    renderLevel(); 
+    els.answerInput.value=''; 
+    els.feedback.textContent='';
+  } else els.winModal.showModal();
+}
+
+function prevLevel(){
+  if(state.index>0){ 
+    state.index--; 
+    renderLevel(); 
+    els.answerInput.value=''; 
+    els.feedback.textContent=''; 
+  }
+}
+
+function hint(){
+  state.hints++; els.hintsUsed.textContent=state.hints;
+  const ans=levels[state.index].answer;
+  const hintChar=ans[Math.floor(Math.random()*ans.length)];
+  els.feedback.textContent=`Hint: contains "${hintChar}"`; els.feedback.className='feedback hint';
+  if(audioOn) whisper.play();
+}
+
+function reveal(){
+  els.answerInput.value=levels[state.index].answer;
+  els.feedback.textContent='Partial reveal'; els.feedback.className='feedback hint';
+}
+
+function giveUp(){
+  els.answerInput.value=levels[state.index].answer;
+  els.feedback.textContent='Answer revealed'; els.feedback.className='feedback hint';
+}
+
+// ===== Event Listeners =====
 els.prevBtn.addEventListener('click',prevLevel);
 els.hintBtn.addEventListener('click',hint);
 els.revealBtn.addEventListener('click',reveal);
 els.giveUpBtn.addEventListener('click',giveUp);
 els.skipBtn.addEventListener('click',nextLevel);
-
 els.copyBtn.addEventListener('click',()=>navigator.clipboard.writeText(els.cipherText.textContent));
 els.resetBtn.addEventListener('click',()=>{
-  shuffledLevels = shuffleArray(levels);
-  state.index=0; state.attempts=0; state.hints=0;
+  state.index=0; state.attempts=0; state.hints=0; state.usedIndexes.clear();
   renderLevel(); els.answerInput.value=''; els.feedback.textContent='';
 });
-
 els.audioToggle.addEventListener('click',()=>{
   audioOn=!audioOn;
   els.audioToggle.textContent=audioOn?'🔊 Audio On':'🔇 Audio Off';
   els.audioToggle.setAttribute('aria-pressed',audioOn);
   if(audioOn) windLoop.play(); else windLoop.pause();
 });
-
 els.helpBtn.addEventListener('click',()=>els.helpModal.showModal());
 els.helpClose.addEventListener('click',()=>els.helpModal.close());
 els.helpOk.addEventListener('click',()=>els.helpModal.close());
-
 els.winClose.addEventListener('click',()=>els.winModal.close());
 els.replayBtn.addEventListener('click',()=>{
-  shuffledLevels = shuffleArray(levels);
-  state.index=0; state.attempts=0; state.hints=0;
+  state.index=0; state.attempts=0; state.hints=0; state.usedIndexes.clear();
   renderLevel(); els.winModal.close(); els.answerInput.value=''; els.feedback.textContent='';
 });
-
 els.shareBtn.addEventListener('click',()=>navigator.clipboard.writeText(window.location.href));
 
-// Hover tooltip for more info
-els.cipherTag.addEventListener('mouseenter',()=>{
-  els.cipherTag.title = `${shuffledLevels[state.index].type}: ${shuffledLevels[state.index].info}`;
-});
+// Hover tooltip shows full explanation
+els.cipherTag.addEventListener('mouseenter',()=>els.cipherTag.title=levels[state.index].type + ': ' + levels[state.index].explanation);
 
 // ===== Init =====
+state.usedIndexes.add(state.index);
 renderLevel();
 
 // ===== Fog animation =====
