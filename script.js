@@ -36,66 +36,68 @@ whisper.volume = 0.55;
 const windLoop = new Audio('https://cdn.pixabay.com/audio/2021/08/08/audio_0a50c9f3d2.mp3');
 windLoop.loop = true; windLoop.volume = 0.18;
 
-// ===== Funny phrases / word pool =====
-const funnyPhrases = [
-  "I love cheese", "Banana hammock", "Dancing penguin", "Flying spaghetti monster",
-  "Taco Tuesday", "Invisible giraffe", "Unicorn farts", "Zombie apocalypse",
-  "Waffle iron", "Toilet paper roll", "Duck face selfie", "Hairy spaghetti",
-  "Cheeseburger planet", "Sneezing panda", "Potato festival", "Cactus hug",
-  "Funky monkey", "Soggy socks", "Laughing llama", "Jellybean tornado",
-  "Tiny dancing robots", "Pirate banana", "Penguin in pajamas", "Cosmic cupcake",
-  "Chocolate volcano", "Rubber duck army", "Silly sock parade", "Marshmallow ninja",
-  "Grumpy taco", "Kitten karate", "Llama llama duck", "Bacon confetti", "Space burrito"
-  // ...add more to reach 100+ if desired
+// ===== Word bank for funny phrases =====
+const wordBank = [
+  'HELLO WORLD', 'I LOVE COFFEE', 'BANANA SPLIT', 'CODE MONKEY', 'PIZZA PARTY',
+  'SLEEPY CAT', 'FUNNY BUNNY', 'DANCE LIKE NOBODY', 'SPAGHETTI TACO', 'TOASTED CHEESE',
+  'WONKY DONKEY', 'HAPPY FEET', 'JELLYFISH JAM', 'SNEEZING PANDA', 'LAUGHING HIPPO'
 ];
 
-// ===== Cipher types =====
-const cipherTypes = [
-  {cipher:'Caesar', type:'Shift cipher', explanation:'Each letter is shifted by a fixed number down the alphabet.'},
-  {cipher:'Atbash', type:'Letter substitution', explanation:'Each letter is replaced by its reverse in the alphabet (A→Z, B→Y).'},
-  {cipher:'Vigenere', type:'Keyword cipher', explanation:'Uses a keyword to shift letters differently across the message.'},
-  {cipher:'Morse', type:'Dots and dashes', explanation:'Represents letters using dots (.) and dashes (-).'},
-  {cipher:'Transposition', type:'Scramble letters', explanation:'Letters are rearranged according to a fixed pattern.'}
-];
+// ===== Cipher generators =====
+function generateLevels() {
+  const ciphers = [
+    { cipher:'Caesar', type:'Shift cipher', explanation:'Each letter is shifted by a fixed number down the alphabet.', encode:caesarEncode },
+    { cipher:'Atbash', type:'Letter substitution', explanation:'Each letter is replaced by its reverse in the alphabet (A→Z, B→Y).', encode:atbashEncode },
+    { cipher:'Vigenere', type:'Keyword cipher', explanation:'Uses a keyword to shift letters differently across the message.', encode:vigenereEncode },
+    { cipher:'Morse', type:'Dots and dashes', explanation:'Represents letters using dots (.) and dashes (-).', encode:morseEncode },
+    { cipher:'Transposition', type:'Scramble letters', explanation:'Letters are rearranged according to a fixed pattern.', encode:transpositionEncode }
+  ];
 
-// ===== Helper functions =====
-function shuffleArray(array){
-  for(let i=array.length-1;i>0;i--){
-    const j=Math.floor(Math.random()*(i+1));
-    [array[i], array[j]]=[array[j], array[i]];
+  let levels = [];
+  const usedWords = new Set();
+  
+  while(levels.length < 5){
+    const word = wordBank[Math.floor(Math.random()*wordBank.length)];
+    if(usedWords.has(word)) continue;
+    usedWords.add(word);
+
+    const cipherObj = ciphers[Math.floor(Math.random()*ciphers.length)];
+    levels.push({
+      cipher: cipherObj.cipher,
+      type: cipherObj.type,
+      explanation: cipherObj.explanation,
+      text: cipherObj.encode(word),
+      answer: word,
+      locked: false,
+      failed: false
+    });
   }
-  return array;
+  return levels;
 }
 
-// Pick 5 random phrases each session
-function generateLevels(){
-  const chosen = shuffleArray([...funnyPhrases]).slice(0,5);
-  return chosen.map(text=>{
-    const cipher = cipherTypes[Math.floor(Math.random()*cipherTypes.length)];
-    let cipherText = text.toUpperCase();
-    // For simplicity, Caesar shift 3 as example
-    if(cipher.cipher==="Caesar"){
-      cipherText = text.toUpperCase().split('').map(c=>{
-        if(c>='A'&&c<='Z') return String.fromCharCode((c.charCodeAt(0)-65+3)%26+65);
-        return c;
-      }).join('');
-    }
-    if(cipher.cipher==="Atbash"){
-      cipherText = text.toUpperCase().split('').map(c=>{
-        if(c>='A'&&c<='Z') return String.fromCharCode(90-(c.charCodeAt(0)-65));
-        return c;
-      }).join('');
-    }
-    if(cipher.cipher==="Morse"){
-      const morseMap = {A:'.-',B:'-...',C:'-.-.',D:'-..',E:'.',F:'..-.',G:'--.',H:'....',I:'..',J:'.---',K:'-.-',L:'.-..',M:'--',N:'-.',O:'---',P:'.--.',Q:'--.-',R:'.-.',S:'...',T:'-',U:'..-',V:'...-',W:'.--',X:'-..-',Y:'-.--',Z:'--..',' ':'/'};
-      cipherText = text.toUpperCase().split('').map(c=>morseMap[c]||c).join(' ');
-    }
-    if(cipher.cipher==="Transposition"){
-      cipherText = text.toUpperCase().split('').sort(()=>Math.random()-0.5).join('');
-    }
-    return {cipher:cipher.cipher,type:cipher.type,explanation:cipher.explanation,text:cipherText,answer:text.toUpperCase(),locked:false,failed:false};
-  });
+// ===== Cipher functions =====
+function caesarEncode(str){ 
+  return str.replace(/[A-Z]/gi, c => String.fromCharCode(((c.toUpperCase().charCodeAt(0)-65+3)%26)+65)); 
 }
+function atbashEncode(str){ 
+  return str.replace(/[A-Z]/gi, c => String.fromCharCode(90-(c.toUpperCase().charCodeAt(0)-65))); 
+}
+function vigenereEncode(str){ 
+  const key = 'FUN'; let res=''; let j=0;
+  for(let i=0;i<str.length;i++){
+    const c = str[i];
+    if(c.match(/[A-Z ]/i)){
+      if(c===' '){ res+=' '; continue; }
+      const shift = key[j%key.length].toUpperCase().charCodeAt(0)-65;
+      res+=String.fromCharCode((c.toUpperCase().charCodeAt(0)-65+shift)%26+65);
+      j++;
+    } else res+=c;
+  }
+  return res;
+}
+const morseMap = {'A':'.-','B':'-...','C':'-.-.','D':'-..','E':'.','F':'..-.','G':'--.','H':'....','I':'..','J':'.---','K':'-.-','L':'.-..','M':'--','N':'-.','O':'---','P':'.--.','Q':'--.-','R':'.-.','S':'...','T':'-','U':'..-','V':'...-','W':'.--','X':'-..-','Y':'-.--','Z':'--..',' ':'/'};
+function morseEncode(str){ return str.toUpperCase().split('').map(c=>morseMap[c]||c).join(' '); }
+function transpositionEncode(str){ return str.split('').sort(()=>Math.random()-0.5).join(''); }
 
 // ===== State =====
 let levels = generateLevels();
@@ -109,7 +111,7 @@ function typeWriter(text, callback){
     if(i<text.length){
       els.cipherText.textContent+=text[i];
       i++;
-      setTimeout(step, 70);
+      setTimeout(step, 50);
     } else callback && callback();
   }
   step();
@@ -128,10 +130,15 @@ function renderLevel(){
   els.answerInput.disabled = level.locked;
 
   els.feedback.textContent='';
-  typeWriter(level.text);
+
+  if(level.text && level.text.length>0){
+    typeWriter(level.text);
+  } else els.cipherText.textContent='...';
+
   updateProgress();
 }
 
+// ===== Progress =====
 function updateProgress(){
   const pct = (state.index+1)/levels.length;
   els.progressTrack.style.setProperty('--pct', pct);
@@ -151,13 +158,12 @@ els.submitBtn.addEventListener('click',()=>{
   const answer = els.answerInput.value.trim().toUpperCase();
   state.attempts++;
   els.attempts.textContent = state.attempts;
-  if(answer===level.answer){
-    els.feedback.textContent='Correct!';
-    els.feedback.className='feedback ok';
-    nextLevel();
+
+  if(answer === level.answer.toUpperCase()){
+    els.feedback.textContent='Correct!'; els.feedback.className='feedback ok';
+    setTimeout(nextLevel,700);
   } else {
-    els.feedback.textContent='Wrong!';
-    els.feedback.className='feedback err';
+    els.feedback.textContent='Wrong!'; els.feedback.className='feedback err';
   }
 });
 
@@ -179,37 +185,29 @@ function prevLevel(){
 
 function hint(){
   const level = levels[state.index];
-  if(level.locked) return;
-  state.hints++; els.hintsUsed.textContent=state.hints;
+  state.hints++; els.hintsUsed.textContent = state.hints;
   const ans=level.answer;
   const hintChar=ans[Math.floor(Math.random()*ans.length)];
-  els.feedback.textContent=`Hint: contains "${hintChar}"`;
-  els.feedback.className='feedback hint';
+  els.feedback.textContent=`Hint: contains "${hintChar}"`; els.feedback.className='feedback hint';
   if(audioOn) whisper.play();
 }
 
 function reveal(){
   const level = levels[state.index];
   if(level.locked) return;
-  let current = els.answerInput.value.toUpperCase();
-  const answer = level.answer;
-  for(let i=0;i<answer.length;i++){
-    if(!current.includes(answer[i])){
-      els.answerInput.value += answer[i];
-      break;
-    }
-  }
-  els.feedback.textContent='Partial reveal';
-  els.feedback.className='feedback hint';
+  const ans=level.answer;
+  const unrevealed = ans.split('').map((c,i)=>i===0? c : '_').join('');
+  els.answerInput.value = unrevealed;
+  els.feedback.textContent='Partial reveal'; els.feedback.className='feedback hint';
 }
 
 function giveUp(){
   const level = levels[state.index];
-  level.locked=true; level.failed=true;
+  level.locked = true;
+  level.failed = true;
   els.answerInput.value = level.answer;
   els.answerInput.disabled = true;
-  els.feedback.textContent='Answer revealed — question locked';
-  els.feedback.className='feedback hint';
+  els.feedback.textContent='You gave up!'; els.feedback.className='feedback err';
   updateProgress();
 }
 
@@ -222,7 +220,7 @@ els.skipBtn.addEventListener('click',nextLevel);
 els.copyBtn.addEventListener('click',()=>navigator.clipboard.writeText(els.cipherText.textContent));
 els.resetBtn.addEventListener('click',()=>{
   levels = generateLevels();
-  state={index:0,attempts:0,hints:0};
+  state = { index:0, attempts:0, hints:0 };
   renderLevel();
 });
 els.audioToggle.addEventListener('click',()=>{
@@ -234,14 +232,19 @@ els.audioToggle.addEventListener('click',()=>{
 els.helpBtn.addEventListener('click',()=>els.helpModal.showModal());
 els.helpClose.addEventListener('click',()=>els.helpModal.close());
 els.helpOk.addEventListener('click',()=>els.helpModal.close());
+els.winClose.addEventListener('click',()=>els.winModal.close());
 els.replayBtn.addEventListener('click',()=>{
   levels = generateLevels();
-  state={index:0,attempts:0,hints:0};
-  renderLevel();
-  els.winModal.close();
+  state = { index:0, attempts:0, hints:0 };
+  renderLevel(); els.winModal.close();
 });
 els.shareBtn.addEventListener('click',()=>navigator.clipboard.writeText(window.location.href));
+
+// Hover tooltip shows instantly
 els.cipherTag.addEventListener('mouseenter',()=>els.cipherTag.title=levels[state.index].type + ': ' + levels[state.index].explanation);
+
+// ===== Init =====
+renderLevel();
 
 // ===== Fog animation =====
 const fogEl = document.getElementById('fog');
@@ -252,6 +255,3 @@ function animateFog(){
   requestAnimationFrame(animateFog);
 }
 animateFog();
-
-// ===== Init =====
-renderLevel();
