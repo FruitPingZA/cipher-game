@@ -26,8 +26,7 @@ const els = {
   progressTrack: document.getElementById('progressTrack'),
   progressDots: document.getElementById('progressDots'),
   cipherTag: document.getElementById('cipherTag'),
-  feedback: document.getElementById('feedback'),
-  score: document.createElement('div')
+  feedback: document.getElementById('feedback')
 };
 
 // ===== Audio =====
@@ -37,15 +36,18 @@ whisper.volume = 0.55;
 const windLoop = new Audio('https://cdn.pixabay.com/audio/2021/08/08/audio_0a50c9f3d2.mp3');
 windLoop.loop = true; windLoop.volume = 0.18;
 
-// ===== Word list (real words/phrases) =====
+// ===== Funny word/phrase list =====
 const WORDS = [
-  "HELLO","WORLD","NIGHT","DAWN","CODE","PUZZLE","MYSTERY","SECRET",
-  "ENIGMA","TRUTH","SHADOW","LIGHT","FIRE","WATER","EARTH","AIR",
-  "CIPHER","KEYWORD","SILENCE","WHISPER","DREAM","VISION","SECRET CODE",
-  "MIDNIGHT","RIDDLE","ANSWER","QUESTION","MAGIC","ALPHA","OMEGA","PHOENIX",
-  "DRAGON","TREASURE","ADVENTURE","KNIGHT","CASTLE","SWORD","SHIELD",
-  "QUEST","JOURNEY","LEGEND","MYTH","FABLE","HORIZON","STARRY NIGHT","MOONLIGHT",
-  // ... add hundreds more for variety
+  "UNICORN FARTS","BANANA PHONE","PIZZA CAT","SPAGHETTI MONSTER","ZOMBIE NINJA",
+  "LASER PENGUIN","TOILET PAPER KING","SLEEPY DRAGON","CUPCAKE WARRIOR","BUBBLE WRAP",
+  "FARTING RAINBOW","SPOOKY TOASTER","WIGGLE SQUAD","TACO PLANET","MOLECULE DANCE",
+  "WATER SLIDE OF DOOM","NAPPING POTATO","CRAZY HAMSTER","GLITCHY ROBOT","DUMPLING THIEF",
+  "COSMIC BUNNY","SNEEZING PENGUIN","FIRE-BREATHING CHICKEN","SUSHI PIRATE","TINY VAMPIRE",
+  "BANANA SUIT","JELLY MONSTER","CLOWN CAT","SPICY PICKLE","TOASTER STRIKES BACK",
+  "MYSTIC FROG","LOLLIPOP NINJA","FLUFFY TACO","DANCE BATTLE OF DOOM","ANGRY KOALA",
+  "POOP SANDWICH","CUP OF CHAOS","SNEAKY TURTLE","CHEESE STORM","RAINBOW LASER",
+  "POTATO KINGDOM","SLOTH WARRIOR","WACKY WIZARD","TURBO CHICKEN","GLITTER BOMBS"
+  // Add hundreds more for variety
 ];
 
 // ===== Cipher Functions =====
