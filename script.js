@@ -36,46 +36,32 @@ whisper.volume = 0.55;
 const windLoop = new Audio('https://cdn.pixabay.com/audio/2021/08/08/audio_0a50c9f3d2.mp3');
 windLoop.loop = true; windLoop.volume = 0.18;
 
-// ===== Funny word/phrase list =====
+// ===== Word Bank =====
 const WORDS = [
   "UNICORN FARTS","BANANA PHONE","PIZZA CAT","SPAGHETTI MONSTER","ZOMBIE NINJA",
   "LASER PENGUIN","TOILET PAPER KING","SLEEPY DRAGON","CUPCAKE WARRIOR","BUBBLE WRAP",
-  "FARTING RAINBOW","SPOOKY TOASTER","WIGGLE SQUAD","TACO PLANET","MOLECULE DANCE",
-  "WATER SLIDE OF DOOM","NAPPING POTATO","CRAZY HAMSTER","GLITCHY ROBOT","DUMPLING THIEF",
-  "COSMIC BUNNY","SNEEZING PENGUIN","FIRE-BREATHING CHICKEN","SUSHI PIRATE","TINY VAMPIRE",
-  "BANANA SUIT","JELLY MONSTER","CLOWN CAT","SPICY PICKLE","TOASTER STRIKES BACK",
-  "MYSTIC FROG","LOLLIPOP NINJA","FLUFFY TACO","DANCE BATTLE OF DOOM","ANGRY KOALA",
-  "POOP SANDWICH","CUP OF CHAOS","SNEAKY TURTLE","CHEESE STORM","RAINBOW LASER",
-  "POTATO KINGDOM","SLOTH WARRIOR","WACKY WIZARD","TURBO CHICKEN","GLITTER BOMBS"
-  // Add hundreds more for variety
+  "DANCING LLAMA","FARTING CLOWN","GIGGLING TURTLE","HICCUPING VAMPIRE","MOON WALKER"
 ];
 
-// ===== Cipher Functions =====
+// ===== Cipher functions =====
 function caesarEncrypt(str, shift=3){
-  return str.toUpperCase().replace(/[A-Z]/g, c=>{
-    return String.fromCharCode((c.charCodeAt(0)-65+shift)%26 + 65);
-  });
+  return str.toUpperCase().replace(/[A-Z]/g, c=>String.fromCharCode((c.charCodeAt(0)-65+shift)%26+65));
 }
-
 function atbashEncrypt(str){
-  return str.toUpperCase().replace(/[A-Z]/g, c=>{
-    return String.fromCharCode(90 - (c.charCodeAt(0)-65));
-  });
+  return str.toUpperCase().replace(/[A-Z]/g, c=>String.fromCharCode(90-(c.charCodeAt(0)-65)));
 }
-
-function vigenereEncrypt(str, key="KEY"){
+function vigenereEncrypt(str,key="KEY"){
   str=str.toUpperCase(); key=key.toUpperCase();
   let res=""; let ki=0;
   for(let c of str){
     if(c>='A' && c<='Z'){
-      let shift = key[ki%key.length].charCodeAt(0)-65;
-      res += String.fromCharCode((c.charCodeAt(0)-65+shift)%26+65);
+      let shift=key[ki%key.length].charCodeAt(0)-65;
+      res+=String.fromCharCode((c.charCodeAt(0)-65+shift)%26+65);
       ki++;
     } else res+=c;
   }
   return res;
 }
-
 function morseEncrypt(str){
   const MORSE = {
     'A':'.-','B':'-...','C':'-.-.','D':'-..','E':'.','F':'..-.','G':'--.',
@@ -85,56 +71,54 @@ function morseEncrypt(str){
   };
   return str.toUpperCase().split('').map(c=>MORSE[c]||c).join(' ');
 }
-
 function transpositionEncrypt(str){
-  let arr = str.split('');
+  let arr=str.split('');
   for(let i=0;i<arr.length-1;i+=2){
-    [arr[i],arr[i+1]]=[arr[i+1],arr[i]];
+    if(arr[i]!==' ' && arr[i+1]!==' ') [arr[i],arr[i+1]]=[arr[i+1],arr[i]];
   }
   return arr.join('');
 }
 
-// ===== Generate random levels =====
+// ===== Level generator =====
 function generateRandomLevels(count=5){
-  const ciphers = [
-    {cipher:'Caesar', type:'Shift cipher', fn:caesarEncrypt, opts:{shift:3}, explanation:'Each letter is shifted by a fixed number down the alphabet.'},
-    {cipher:'Atbash', type:'Letter substitution', fn:atbashEncrypt, opts:{}, explanation:'Each letter is replaced by its reverse in the alphabet (A→Z, B→Y).'},
-    {cipher:'Vigenère', type:'Keyword cipher', fn:vigenereEncrypt, opts:{key:'KEY'}, explanation:'Uses a keyword to shift letters differently across the message.'},
-    {cipher:'Morse', type:'Dots and dashes', fn:morseEncrypt, opts:{}, explanation:'Represents letters using dots (.) and dashes (-).'},
-    {cipher:'Transposition', type:'Scramble letters', fn:transpositionEncrypt, opts:{}, explanation:'Letters are rearranged according to a fixed pattern.'}
+  const levels=[];
+  const ciphers=[
+    {name:'Caesar',func:caesarEncrypt,type:'Shift cipher',explanation:'Each letter is shifted by a fixed number down the alphabet.'},
+    {name:'Atbash',func:atbashEncrypt,type:'Letter substitution',explanation:'Each letter is replaced by its reverse in the alphabet (A→Z, B→Y).'},
+    {name:'Vigenere',func:(txt)=>vigenereEncrypt(txt,'FUN'),type:'Keyword cipher',explanation:'Uses a keyword to shift letters differently across the message.'},
+    {name:'Morse',func:morseEncrypt,type:'Dots and dashes',explanation:'Represents letters using dots (.) and dashes (-).'},
+    {name:'Transposition',func:transpositionEncrypt,type:'Scramble letters',explanation:'Letters are rearranged according to a fixed pattern.'}
   ];
-  
-  let selectedWords = [];
-  while(selectedWords.length<count){
-    const w = WORDS[Math.floor(Math.random()*WORDS.length)];
-    if(!selectedWords.includes(w)) selectedWords.push(w);
+  const usedWords = new Set();
+  while(levels.length<count){
+    let word=WORDS[Math.floor(Math.random()*WORDS.length)];
+    if(usedWords.has(word)) continue;
+    usedWords.add(word);
+    const cipher=ciphers[Math.floor(Math.random()*ciphers.length)];
+    levels.push({
+      cipher:cipher.name,
+      type:cipher.type,
+      explanation:cipher.explanation,
+      text:cipher.func(word),
+      answer:word.toUpperCase()
+    });
   }
-  
-  return selectedWords.map(w=>{
-    const c = ciphers[Math.floor(Math.random()*ciphers.length)];
-    return {
-      cipher: c.cipher,
-      type: c.type,
-      explanation: c.explanation,
-      text: c.fn(w, ...(c.opts.key? [c.opts.key] : [])),
-      answer: w,
-      locked:false,
-      failed:false
-    };
-  });
+  return levels;
 }
 
-// ===== State =====
 let levels = generateRandomLevels(5);
-let state = {index:0, attempts:0, hints:0, correct:0, failed:0};
+
+// ===== State =====
+let state = { index:0, attempts:0, hints:0, givenUp:false, correct:0, failed:0 };
 
 // ===== Typewriter effect =====
-function typeWriter(text, callback){
+function typeWriter(text,callback){
   els.cipherText.textContent='';
   let i=0;
   function step(){
     if(i<text.length){
-      els.cipherText.textContent+=text[i]; i++;
+      els.cipherText.textContent+=text[i];
+      i++;
       setTimeout(step,70);
     } else callback && callback();
   }
@@ -143,59 +127,69 @@ function typeWriter(text, callback){
 
 // ===== Render level =====
 function renderLevel(){
-  const lvl=levels[state.index];
+  const level=levels[state.index];
   els.levelIndicator.textContent=`${state.index+1} / ${levels.length}`;
-  els.levelTitle.textContent=`Level ${state.index+1} — ${lvl.cipher}`;
-  els.cipherTag.title=`${lvl.type}: ${lvl.explanation}`;
+  els.levelTitle.textContent=`Level ${state.index+1} — ${level.cipher}`;
+  els.cipherTag.title=`${level.type}: ${level.explanation}`;
   els.attempts.textContent=state.attempts;
   els.hintsUsed.textContent=state.hints;
+  els.answerInput.disabled=state.givenUp;
   els.feedback.textContent='';
-  typeWriter(lvl.text);
-  els.answerInput.value='';
-  els.answerInput.disabled=lvl.locked;
-  els.submitBtn.disabled=lvl.locked;
+  typeWriter(level.text);
   updateProgress();
 }
 
-// ===== Update progress =====
 function updateProgress(){
+  const pct=(state.correct+state.failed)/levels.length;
+  els.progressTrack.style.setProperty('--pct',pct);
   els.progressDots.innerHTML='';
-  levels.forEach((lvl,i)=>{
+  for(let i=0;i<levels.length;i++){
     const dot=document.createElement('div'); dot.classList.add('dot');
     if(i===state.index) dot.classList.add('active');
-    if(lvl.failed) dot.classList.add('failed');
+    if(i<state.index){
+      if(levels[i].locked) dot.classList.add('done');
+    }
     els.progressDots.appendChild(dot);
-  });
+  }
 }
 
 // ===== Actions =====
 els.submitBtn.addEventListener('click',()=>{
-  const lvl=levels[state.index];
-  if(lvl.locked) return;
-  const ans=els.answerInput.value.trim().toUpperCase();
-  const correct=lvl.answer.toUpperCase();
+  if(state.givenUp) return;
+  const answer=els.answerInput.value.trim().toUpperCase();
+  const correct=levels[state.index].answer;
   state.attempts++;
   els.attempts.textContent=state.attempts;
-  if(ans===correct){
-    state.correct++;
+  if(answer===correct){
     els.feedback.textContent='Correct!'; els.feedback.className='feedback ok';
+    state.correct++;
     setTimeout(nextLevel,700);
   } else {
-    els.feedback.textContent='Wrong! Try again.'; els.feedback.className='feedback err';
+    els.feedback.textContent='Wrong!'; els.feedback.className='feedback err';
   }
 });
 
 function nextLevel(){
-  if(state.index<levels.length-1){ state.index++; renderLevel(); } 
-  else els.winModal.showModal();
+  if(state.index<levels.length-1){
+    state.index++;
+    state.givenUp=false;
+    renderLevel();
+    els.answerInput.value='';
+  } else endGame();
 }
 
 function prevLevel(){
-  if(state.index>0){ state.index--; renderLevel(); }
+  if(state.index>0){
+    state.index--;
+    state.givenUp=levels[state.index].locked||false;
+    renderLevel();
+    els.answerInput.value='';
+  }
 }
 
 function hint(){
-  state.hints++; els.hintsUsed.textContent=state.hints;
+  state.hints++;
+  els.hintsUsed.textContent=state.hints;
   const ans=levels[state.index].answer;
   const hintChar=ans[Math.floor(Math.random()*ans.length)];
   els.feedback.textContent=`Hint: contains "${hintChar}"`; els.feedback.className='feedback hint';
@@ -203,63 +197,53 @@ function hint(){
 }
 
 function reveal(){
-  const lvl=levels[state.index];
-  const ans=lvl.answer;
+  const ans=levels[state.index].answer;
   let current=els.answerInput.value.toUpperCase();
   for(let i=0;i<ans.length;i++){
-    if(!current[i]) { current=current.slice(0,i)+ans[i]+current.slice(i+1); break; }
+    if(!current[i] || current[i]!==(ans[i])){
+      els.answerInput.value=current.substring(0,i)+ans[i]+current.substring(i+1);
+      break;
+    }
   }
-  els.answerInput.value=current;
   els.feedback.textContent='Partial reveal'; els.feedback.className='feedback hint';
 }
 
 function giveUp(){
-  const lvl=levels[state.index];
-  lvl.locked=true;
-  lvl.failed=true;
-  state.failed++;
-  els.answerInput.value=lvl.answer;
+  state.givenUp=true;
+  levels[state.index].locked=true;
+  els.answerInput.value=levels[state.index].answer;
   els.answerInput.disabled=true;
-  els.submitBtn.disabled=true;
-  els.feedback.textContent='You gave up!'; els.feedback.className='feedback hint';
-  updateProgress();
+  state.failed++;
+  els.feedback.textContent='Answer revealed — Locked'; els.feedback.className='feedback hint';
 }
 
-// ===== Event Listeners =====
+function endGame(){
+  els.winModal.showModal();
+}
+
+// ===== Event listeners =====
 els.prevBtn.addEventListener('click',prevLevel);
 els.hintBtn.addEventListener('click',hint);
 els.revealBtn.addEventListener('click',reveal);
 els.giveUpBtn.addEventListener('click',giveUp);
 els.skipBtn.addEventListener('click',nextLevel);
 els.copyBtn.addEventListener('click',()=>navigator.clipboard.writeText(els.cipherText.textContent));
-els.resetBtn.addEventListener('click',()=>{
-  levels=generateRandomLevels(5);
-  state={index:0, attempts:0, hints:0, correct:0, failed:0};
-  renderLevel();
-});
+els.resetBtn.addEventListener('click',()=>location.reload());
 els.audioToggle.addEventListener('click',()=>{
   audioOn=!audioOn;
   els.audioToggle.textContent=audioOn?'🔊 Audio On':'🔇 Audio Off';
+  els.audioToggle.setAttribute('aria-pressed',audioOn);
   if(audioOn) windLoop.play(); else windLoop.pause();
 });
 els.helpBtn.addEventListener('click',()=>els.helpModal.showModal());
 els.helpClose.addEventListener('click',()=>els.helpModal.close());
 els.helpOk.addEventListener('click',()=>els.helpModal.close());
 els.winClose.addEventListener('click',()=>els.winModal.close());
-els.replayBtn.addEventListener('click',()=>{
-  levels=generateRandomLevels(5);
-  state={index:0, attempts:0, hints:0, correct:0, failed:0};
-  renderLevel(); els.winModal.close();
-});
+els.replayBtn.addEventListener('click',()=>location.reload());
 els.shareBtn.addEventListener('click',()=>navigator.clipboard.writeText(window.location.href));
 
-// Hover tooltip shows explanation instantly
-els.cipherTag.addEventListener('mouseenter',()=>{els.cipherTag.title=levels[state.index].type+': '+levels[state.index].explanation;});
+// Hover tooltip instantly shows
+els.cipherTag.addEventListener('mouseenter',()=>els.cipherTag.title=levels[state.index].type + ': ' + levels[state.index].explanation);
 
 // ===== Init =====
 renderLevel();
-
-// ===== Fog animation =====
-const fogEl=document.getElementById('fog'); let fogOffset=0;
-function animateFog(){ fogOffset+=0.05; fogEl.style.backgroundPosition=`${fogOffset}px ${fogOffset/2}px`; requestAnimationFrame(animateFog);}
-animateFog();
