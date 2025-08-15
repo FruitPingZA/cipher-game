@@ -1,26 +1,128 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Cipher Puzzle Game</title>
-    <link rel="stylesheet" href="style.css">
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Cipher Nexus — Puzzle Game</title>
+  <meta name="description" content="A sleek browser-based cipher puzzle game with multiple levels, animated neon UI, and optional whisper hints (off by default)." />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-    <div class="game-container">
-        <h1>Cipher Puzzle Game</h1>
-        <div class="puzzle">
-            <p id="cipher-text">Khoor Zruog!</p>
-            <input type="text" id="answer" placeholder="Type your answer...">
-            <button id="submit-answer">Submit</button>
-        </div>
-        <div class="controls">
-            <button id="toggle-audio">🔇 Audio Off</button>
-            <button id="hint-btn">💡 Hint</button>
-        </div>
-        <p id="feedback"></p>
-    </div>
+  <canvas id="bg-particles" aria-hidden="true"></canvas>
 
-    <script src="script.js"></script>
+  <div id="app" class="app">
+    <header class="topbar">
+      <div class="brand">
+        <span class="logo-glow"></span>
+        <h1 class="title" aria-label="Cipher Nexus Puzzle Game">
+          <span class="title-line">CIPHER</span>
+          <span class="title-line accent">NEXUS</span>
+        </h1>
+      </div>
+
+      <nav class="controls" aria-label="Game Controls">
+        <button id="audioToggle" class="btn btn-ghost" aria-pressed="false" aria-label="Toggle audio hints (off by default)">🔇 Audio Off</button>
+        <button id="helpBtn" class="btn btn-ghost" aria-haspopup="dialog" aria-controls="helpModal">❓ Help</button>
+        <button id="resetBtn" class="btn btn-ghost">↺ Reset</button>
+      </nav>
+    </header>
+
+    <main class="content">
+      <section class="hud">
+        <div class="hud-item">
+          <span class="hud-label">Level</span>
+          <span id="levelIndicator" class="hud-value">1 / 5</span>
+        </div>
+        <div class="hud-item">
+          <span class="hud-label">Attempts</span>
+          <span id="attempts" class="hud-value">0</span>
+        </div>
+        <div class="hud-item">
+          <span class="hud-label">Hints Used</span>
+          <span id="hintsUsed" class="hud-value">0</span>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="card-header">
+          <h2 id="levelTitle" class="level-title">Level 1 — Caesar Shift</h2>
+          <div class="tag">Cipher</div>
+        </div>
+
+        <div class="cipher-wrap">
+          <p id="cipherText" class="cipher-text" aria-live="polite" aria-atomic="true"></p>
+          <button id="copyBtn" class="btn btn-slim" title="Copy cipher text">Copy</button>
+        </div>
+
+        <div class="input-wrap">
+          <input id="answerInput" class="input" type="text" placeholder="Type your answer…" autocomplete="off" aria-label="Your decoded answer" />
+          <button id="submitBtn" class="btn primary">Submit</button>
+        </div>
+
+        <div class="feedback" role="status" aria-live="polite" id="feedback"></div>
+
+        <div class="actions">
+          <button id="hintBtn" class="btn">💡 Hint</button>
+          <button id="revealBtn" class="btn btn-ghost">👁 Reveal One Letter</button>
+          <button id="skipBtn" class="btn btn-ghost" title="Skip this level (no penalty)">⤼ Skip</button>
+        </div>
+      </section>
+
+      <section class="progress">
+        <div id="progressTrack" class="progress-track" aria-hidden="true"></div>
+        <div id="progressDots" class="progress-dots" aria-label="Level progress"></div>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <span>Made for the curious. Audio hints are optional.</span>
+    </footer>
+  </div>
+
+  <!-- Help Modal -->
+  <dialog id="helpModal" class="modal">
+    <div class="modal-card">
+      <header class="modal-header">
+        <h3>How to Play</h3>
+        <button class="btn btn-ghost close" id="helpClose" aria-label="Close help">✕</button>
+      </header>
+      <div class="modal-body">
+        <ul class="help-list">
+          <li><strong>Goal:</strong> Decode the secret message for each level.</li>
+          <li><strong>Types:</strong> Caesar, Atbash, Vigenère, Morse, Transposition.</li>
+          <li><strong>Hints:</strong> Click <em>Hint</em> for a textual nudge. If audio is enabled, you’ll hear a subtle whisper.</li>
+          <li><strong>Reveal:</strong> <em>Reveal One Letter</em> fills a correct character in your answer.</li>
+          <li><strong>Audio:</strong> Off by default. Toggle it in the top bar.</li>
+          <li><strong>Skip:</strong> You can skip any level and return later.</li>
+          <li><strong>Save:</strong> Progress auto-saves in your browser.</li>
+        </ul>
+      </div>
+      <footer class="modal-footer">
+        <button class="btn primary" id="helpOk">Got it</button>
+      </footer>
+    </div>
+  </dialog>
+
+  <!-- Win Modal -->
+  <dialog id="winModal" class="modal">
+    <div class="modal-card">
+      <header class="modal-header">
+        <h3>All Levels Complete!</h3>
+        <button class="btn btn-ghost close" id="winClose" aria-label="Close">✕</button>
+      </header>
+      <div class="modal-body">
+        <p>Bravo, codebreaker. You conquered every cipher.</p>
+        <p class="mono small">Tip: Refresh to try again or share the page to challenge a friend.</p>
+      </div>
+      <footer class="modal-footer">
+        <button class="btn" id="replayBtn">Replay</button>
+        <button class="btn primary" id="shareBtn">Share</button>
+      </footer>
+    </div>
+  </dialog>
+
+  <script src="script.js" defer></script>
 </body>
 </html>
