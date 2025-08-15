@@ -3,29 +3,32 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Cipher Nexus — Puzzle Game</title>
-  <meta name="description" content="A sleek browser-based cipher puzzle game with multiple levels, animated neon UI, and optional whisper hints (off by default)." />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+  <title>Cipher Nexus — Nightfall Edition</title>
+  <meta name="description" content="A creepy, atmospheric cipher puzzle game with fog, typewriter vibes, and optional whisper hints (off by default)." />
+  <!-- Fonts: typewriter + serif -->
+  <link href="https://fonts.googleapis.com/css2?family=Special+Elite&family=Spectral:wght@400;600;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <canvas id="bg-particles" aria-hidden="true"></canvas>
+  <!-- Atmospheric layers -->
+  <img id="bg-image" alt="" src="https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=1920&q=80" />
+  <canvas id="fog" aria-hidden="true"></canvas>
+  <div id="vignette" aria-hidden="true"></div>
+  <div id="grain" aria-hidden="true"></div>
 
   <div id="app" class="app">
     <header class="topbar">
       <div class="brand">
-        <span class="logo-glow"></span>
-        <h1 class="title" aria-label="Cipher Nexus Puzzle Game">
+        <h1 class="title" aria-label="Cipher Nexus Nightfall Edition">
           <span class="title-line">CIPHER</span>
           <span class="title-line accent">NEXUS</span>
         </h1>
+        <div class="sub">Nightfall Edition</div>
       </div>
-
       <nav class="controls" aria-label="Game Controls">
-        <button id="audioToggle" class="btn btn-ghost" aria-pressed="false" aria-label="Toggle audio hints (off by default)">🔇 Audio Off</button>
-        <button id="helpBtn" class="btn btn-ghost" aria-haspopup="dialog" aria-controls="helpModal">❓ Help</button>
-        <button id="resetBtn" class="btn btn-ghost">↺ Reset</button>
+        <button id="audioToggle" class="btn ghost" aria-pressed="false" aria-label="Toggle audio hints (off by default)">🔇 Audio Off</button>
+        <button id="helpBtn" class="btn ghost" aria-haspopup="dialog" aria-controls="helpModal">❓ Help</button>
+        <button id="resetBtn" class="btn ghost">↺ Reset</button>
       </nav>
     </header>
 
@@ -45,7 +48,7 @@
         </div>
       </section>
 
-      <section class="card">
+      <section class="card flashlight-scope">
         <div class="card-header">
           <h2 id="levelTitle" class="level-title">Level 1 — Caesar Shift</h2>
           <div class="tag">Cipher</div>
@@ -53,7 +56,7 @@
 
         <div class="cipher-wrap">
           <p id="cipherText" class="cipher-text" aria-live="polite" aria-atomic="true"></p>
-          <button id="copyBtn" class="btn btn-slim" title="Copy cipher text">Copy</button>
+          <button id="copyBtn" class="btn slim" title="Copy cipher text">Copy</button>
         </div>
 
         <div class="input-wrap">
@@ -65,8 +68,8 @@
 
         <div class="actions">
           <button id="hintBtn" class="btn">💡 Hint</button>
-          <button id="revealBtn" class="btn btn-ghost">👁 Reveal One Letter</button>
-          <button id="skipBtn" class="btn btn-ghost" title="Skip this level (no penalty)">⤼ Skip</button>
+          <button id="revealBtn" class="btn ghost">👁 Reveal One Letter</button>
+          <button id="skipBtn" class="btn ghost" title="Skip this level (no penalty)">⤼ Skip</button>
         </div>
       </section>
 
@@ -77,7 +80,7 @@
     </main>
 
     <footer class="footer">
-      <span>Made for the curious. Audio hints are optional.</span>
+      <span>Inspired by moody, flashlight-through-fog thriller vibes. Audio hints are optional.</span>
     </footer>
   </div>
 
@@ -86,16 +89,16 @@
     <div class="modal-card">
       <header class="modal-header">
         <h3>How to Play</h3>
-        <button class="btn btn-ghost close" id="helpClose" aria-label="Close help">✕</button>
+        <button class="btn ghost close" id="helpClose" aria-label="Close help">✕</button>
       </header>
       <div class="modal-body">
         <ul class="help-list">
-          <li><strong>Goal:</strong> Decode the secret message for each level.</li>
+          <li><strong>Goal:</strong> Decode the message each level hides.</li>
           <li><strong>Types:</strong> Caesar, Atbash, Vigenère, Morse, Transposition.</li>
-          <li><strong>Hints:</strong> Click <em>Hint</em> for a textual nudge. If audio is enabled, you’ll hear a subtle whisper.</li>
-          <li><strong>Reveal:</strong> <em>Reveal One Letter</em> fills a correct character in your answer.</li>
-          <li><strong>Audio:</strong> Off by default. Toggle it in the top bar.</li>
-          <li><strong>Skip:</strong> You can skip any level and return later.</li>
+          <li><strong>Hints:</strong> Click <em>Hint</em> for a textual nudge; with audio ON you’ll hear a whisper.</li>
+          <li><strong>Reveal:</strong> <em>Reveal One Letter</em> fills a correct character.</li>
+          <li><strong>Flashlight:</strong> Move your cursor/touch to “illuminate” the cipher area.</li>
+          <li><strong>Skip:</strong> You can skip and come back later.</li>
           <li><strong>Save:</strong> Progress auto-saves in your browser.</li>
         </ul>
       </div>
@@ -110,11 +113,11 @@
     <div class="modal-card">
       <header class="modal-header">
         <h3>All Levels Complete!</h3>
-        <button class="btn btn-ghost close" id="winClose" aria-label="Close">✕</button>
+        <button class="btn ghost close" id="winClose" aria-label="Close">✕</button>
       </header>
       <div class="modal-body">
-        <p>Bravo, codebreaker. You conquered every cipher.</p>
-        <p class="mono small">Tip: Refresh to try again or share the page to challenge a friend.</p>
+        <p>Bravo, codebreaker. Night yields to dawn.</p>
+        <p class="mono small">Tip: Refresh to replay or share the link to challenge a friend.</p>
       </div>
       <footer class="modal-footer">
         <button class="btn" id="replayBtn">Replay</button>
