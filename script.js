@@ -45,7 +45,7 @@ let levels = [
   {cipher:'Transposition', type:'Scramble letters', explanation:'Letters are rearranged according to a fixed pattern.', text:'OLEHL', answer:'HELLO'}
 ];
 
-// ===== Shuffle levels to start differently each session =====
+// ===== Shuffle levels =====
 function shuffleArray(array){
   for(let i=array.length-1;i>0;i--){
     const j=Math.floor(Math.random()*(i+1));
@@ -56,7 +56,7 @@ function shuffleArray(array){
 levels = shuffleArray(levels);
 
 // ===== State =====
-let state = { index:0, attempts:0, hints:0, usedIndexes: new Set() };
+let state = { index:0, attempts:0, hints:0, usedIndexes: new Set(), revealed:false };
 
 // ===== Typewriter effect =====
 function typeWriter(text, callback){
@@ -80,6 +80,9 @@ function renderLevel(){
   els.cipherTag.title = `${level.type}: ${level.explanation}`;
   els.attempts.textContent = state.attempts;
   els.hintsUsed.textContent = state.hints;
+  state.revealed = false;
+  els.answerInput.disabled = false;
+  els.feedback.textContent = '';
   updateProgress();
   typeWriter(level.text);
 }
@@ -98,10 +101,17 @@ function updateProgress(){
 
 // ===== Actions =====
 els.submitBtn.addEventListener('click',()=>{
+  if(state.revealed){
+    els.feedback.textContent = 'Answer already revealed. Use Next/Previous.';
+    els.feedback.className='feedback err';
+    return;
+  }
+
   const answer = els.answerInput.value.trim().toUpperCase();
   const correct = levels[state.index].answer.toUpperCase();
   state.attempts++;
   els.attempts.textContent = state.attempts;
+
   if(answer===correct){
     els.feedback.textContent='Correct!'; els.feedback.className='feedback ok';
     setTimeout(nextLevel,700);
@@ -139,13 +149,29 @@ function hint(){
 }
 
 function reveal(){
-  els.answerInput.value=levels[state.index].answer;
+  const ans = levels[state.index].answer.toUpperCase();
+  let inputVal = els.answerInput.value.toUpperCase().padEnd(ans.length, '_');
+  
+  // find unrevealed indices
+  let unrevealed = [];
+  for(let i=0;i<ans.length;i++){
+    if(inputVal[i] === '_') unrevealed.push(i);
+  }
+  if(unrevealed.length === 0) return; // all letters already revealed
+
+  const randomIndex = unrevealed[Math.floor(Math.random()*unrevealed.length)];
+  inputVal = inputVal.split('');
+  inputVal[randomIndex] = ans[randomIndex];
+  els.answerInput.value = inputVal.join('');
   els.feedback.textContent='Partial reveal'; els.feedback.className='feedback hint';
 }
 
 function giveUp(){
-  els.answerInput.value=levels[state.index].answer;
+  const ans = levels[state.index].answer.toUpperCase();
+  els.answerInput.value = ans;
   els.feedback.textContent='Answer revealed'; els.feedback.className='feedback hint';
+  state.revealed = true;
+  els.answerInput.disabled = true;
 }
 
 // ===== Event Listeners =====
@@ -156,7 +182,7 @@ els.giveUpBtn.addEventListener('click',giveUp);
 els.skipBtn.addEventListener('click',nextLevel);
 els.copyBtn.addEventListener('click',()=>navigator.clipboard.writeText(els.cipherText.textContent));
 els.resetBtn.addEventListener('click',()=>{
-  state.index=0; state.attempts=0; state.hints=0; state.usedIndexes.clear();
+  state.index=0; state.attempts=0; state.hints=0; state.usedIndexes.clear(); state.revealed=false;
   renderLevel(); els.answerInput.value=''; els.feedback.textContent='';
 });
 els.audioToggle.addEventListener('click',()=>{
@@ -170,12 +196,12 @@ els.helpClose.addEventListener('click',()=>els.helpModal.close());
 els.helpOk.addEventListener('click',()=>els.helpModal.close());
 els.winClose.addEventListener('click',()=>els.winModal.close());
 els.replayBtn.addEventListener('click',()=>{
-  state.index=0; state.attempts=0; state.hints=0; state.usedIndexes.clear();
+  state.index=0; state.attempts=0; state.hints=0; state.usedIndexes.clear(); state.revealed=false;
   renderLevel(); els.winModal.close(); els.answerInput.value=''; els.feedback.textContent='';
 });
 els.shareBtn.addEventListener('click',()=>navigator.clipboard.writeText(window.location.href));
 
-// Hover tooltip shows full explanation
+// Hover tooltip updates dynamically
 els.cipherTag.addEventListener('mouseenter',()=>els.cipherTag.title=levels[state.index].type + ': ' + levels[state.index].explanation);
 
 // ===== Init =====
