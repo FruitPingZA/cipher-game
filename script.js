@@ -7,9 +7,7 @@ const els = {
   helpClose: document.getElementById('helpClose'),
   helpOk: document.getElementById('helpOk'),
   winModal: document.getElementById('winModal'),
-  winClose: document.getElementById('winClose'),
   replayBtn: document.getElementById('replayBtn'),
-  shareBtn: document.getElementById('shareBtn'),
   levelIndicator: document.getElementById('levelIndicator'),
   attempts: document.getElementById('attempts'),
   hintsUsed: document.getElementById('hintsUsed'),
@@ -26,7 +24,9 @@ const els = {
   progressTrack: document.getElementById('progressTrack'),
   progressDots: document.getElementById('progressDots'),
   cipherTag: document.getElementById('cipherTag'),
-  feedback: document.getElementById('feedback')
+  feedback: document.getElementById('feedback'),
+  correctCount: document.getElementById('correctCount'),
+  failedCount: document.getElementById('failedCount')
 };
 
 // ===== Audio =====
@@ -36,74 +36,30 @@ whisper.volume = 0.55;
 const windLoop = new Audio('https://cdn.pixabay.com/audio/2021/08/08/audio_0a50c9f3d2.mp3');
 windLoop.loop = true; windLoop.volume = 0.18;
 
-// ===== Word bank for funny phrases =====
-const wordBank = [
-  'HELLO WORLD', 'I LOVE COFFEE', 'BANANA SPLIT', 'CODE MONKEY', 'PIZZA PARTY',
-  'SLEEPY CAT', 'FUNNY BUNNY', 'DANCE LIKE NOBODY', 'SPAGHETTI TACO', 'TOASTED CHEESE',
-  'WONKY DONKEY', 'HAPPY FEET', 'JELLYFISH JAM', 'SNEEZING PANDA', 'LAUGHING HIPPO'
-];
-
-// ===== Cipher generators =====
-function generateLevels() {
-  const ciphers = [
-    { cipher:'Caesar', type:'Shift cipher', explanation:'Each letter is shifted by a fixed number down the alphabet.', encode:caesarEncode },
-    { cipher:'Atbash', type:'Letter substitution', explanation:'Each letter is replaced by its reverse in the alphabet (A→Z, B→Y).', encode:atbashEncode },
-    { cipher:'Vigenere', type:'Keyword cipher', explanation:'Uses a keyword to shift letters differently across the message.', encode:vigenereEncode },
-    { cipher:'Morse', type:'Dots and dashes', explanation:'Represents letters using dots (.) and dashes (-).', encode:morseEncode },
-    { cipher:'Transposition', type:'Scramble letters', explanation:'Letters are rearranged according to a fixed pattern.', encode:transpositionEncode }
-  ];
-
-  let levels = [];
-  const usedWords = new Set();
-  
-  while(levels.length < 5){
-    const word = wordBank[Math.floor(Math.random()*wordBank.length)];
-    if(usedWords.has(word)) continue;
-    usedWords.add(word);
-
-    const cipherObj = ciphers[Math.floor(Math.random()*ciphers.length)];
-    levels.push({
-      cipher: cipherObj.cipher,
-      type: cipherObj.type,
-      explanation: cipherObj.explanation,
-      text: cipherObj.encode(word),
-      answer: word,
-      locked: false,
-      failed: false
-    });
+// ===== Generate funny word phrases =====
+function generateFunnyWords(count){
+  const words = ["BANANA", "SPOON", "CATNAP", "CHEESE", "FLOPPY DISK", "NINJA", "UNICORN", "COFFEE", "PIZZA SLICE","TACO","KANGAROO","MUSHROOM","PENGUIN","TOILET PAPER","BUBBLE GUM"];
+  let levels=[];
+  for(let i=0;i<count;i++){
+    const word = words[Math.floor(Math.random()*words.length)];
+    const ciphers = [
+      {cipher:'Caesar', type:'Shift cipher', explanation:'Each letter is shifted by a fixed number down the alphabet.'},
+      {cipher:'Atbash', type:'Letter substitution', explanation:'Each letter is replaced by its reverse in the alphabet (A→Z, B→Y).'},
+      {cipher:'Vigenere', type:'Keyword cipher', explanation:'Uses a keyword to shift letters differently across the message.'},
+      {cipher:'Morse', type:'Dots and dashes', explanation:'Represents letters using dots (.) and dashes (-).'},
+      {cipher:'Transposition', type:'Scramble letters', explanation:'Letters are rearranged according to a fixed pattern.'}
+    ];
+    const c = ciphers[Math.floor(Math.random()*ciphers.length)];
+    levels.push({...c, text:word, answer:word});
   }
   return levels;
 }
 
-// ===== Cipher functions =====
-function caesarEncode(str){ 
-  return str.replace(/[A-Z]/gi, c => String.fromCharCode(((c.toUpperCase().charCodeAt(0)-65+3)%26)+65)); 
-}
-function atbashEncode(str){ 
-  return str.replace(/[A-Z]/gi, c => String.fromCharCode(90-(c.toUpperCase().charCodeAt(0)-65))); 
-}
-function vigenereEncode(str){ 
-  const key = 'FUN'; let res=''; let j=0;
-  for(let i=0;i<str.length;i++){
-    const c = str[i];
-    if(c.match(/[A-Z ]/i)){
-      if(c===' '){ res+=' '; continue; }
-      const shift = key[j%key.length].toUpperCase().charCodeAt(0)-65;
-      res+=String.fromCharCode((c.toUpperCase().charCodeAt(0)-65+shift)%26+65);
-      j++;
-    } else res+=c;
-  }
-  return res;
-}
-const morseMap = {'A':'.-','B':'-...','C':'-.-.','D':'-..','E':'.','F':'..-.','G':'--.','H':'....','I':'..','J':'.---','K':'-.-','L':'.-..','M':'--','N':'-.','O':'---','P':'.--.','Q':'--.-','R':'.-.','S':'...','T':'-','U':'..-','V':'...-','W':'.--','X':'-..-','Y':'-.--','Z':'--..',' ':'/'};
-function morseEncode(str){ return str.toUpperCase().split('').map(c=>morseMap[c]||c).join(' '); }
-function transpositionEncode(str){ return str.split('').sort(()=>Math.random()-0.5).join(''); }
-
 // ===== State =====
-let levels = generateLevels();
+let levels = generateFunnyWords(5);
 let state = { index:0, attempts:0, hints:0 };
 
-// ===== Typewriter =====
+// ===== Typewriter effect =====
 function typeWriter(text, callback){
   els.cipherText.textContent='';
   let i=0;
@@ -122,20 +78,14 @@ function renderLevel(){
   const level = levels[state.index];
   els.levelIndicator.textContent = `${state.index+1} / ${levels.length}`;
   els.levelTitle.textContent = `Level ${state.index+1} — ${level.cipher}`;
+  els.cipherTag.textContent = level.cipher;
   els.cipherTag.title = `${level.type}: ${level.explanation}`;
-  els.attempts.textContent = state.attempts;
-  els.hintsUsed.textContent = state.hints;
-
   els.answerInput.value='';
-  els.answerInput.disabled = level.locked;
-
+  els.answerInput.disabled = !!level.locked;
   els.feedback.textContent='';
-
-  if(level.text && level.text.length>0){
-    typeWriter(level.text);
-  } else els.cipherText.textContent='...';
-
+  typeWriter(level.text);
   updateProgress();
+  updateStats();
 }
 
 // ===== Progress =====
@@ -146,9 +96,17 @@ function updateProgress(){
   for(let i=0;i<levels.length;i++){
     const dot = document.createElement('div'); dot.classList.add('dot');
     if(i===state.index) dot.classList.add('active');
-    if(levels[i].failed) dot.classList.add('done');
+    if(levels[i].failed || levels[i].correct) dot.classList.add('done');
     els.progressDots.appendChild(dot);
   }
+}
+
+// ===== Stats =====
+function updateStats(){
+  const correct = levels.filter(l=>l.correct).length;
+  const failed = levels.filter(l=>l.failed).length;
+  els.correctCount.textContent = `Correct: ${correct}`;
+  els.failedCount.textContent = `Failed: ${failed}`;
 }
 
 // ===== Actions =====
@@ -156,11 +114,12 @@ els.submitBtn.addEventListener('click',()=>{
   const level = levels[state.index];
   if(level.locked) return;
   const answer = els.answerInput.value.trim().toUpperCase();
+  const correct = level.answer.toUpperCase();
   state.attempts++;
   els.attempts.textContent = state.attempts;
-
-  if(answer === level.answer.toUpperCase()){
+  if(answer===correct){
     els.feedback.textContent='Correct!'; els.feedback.className='feedback ok';
+    level.correct = true;
     setTimeout(nextLevel,700);
   } else {
     els.feedback.textContent='Wrong!'; els.feedback.className='feedback err';
@@ -177,15 +136,16 @@ function nextLevel(){
 }
 
 function prevLevel(){
-  if(state.index>0){
-    state.index--;
-    renderLevel();
+  if(state.index>0){ 
+    state.index--; 
+    renderLevel(); 
   }
 }
 
 function hint(){
   const level = levels[state.index];
-  state.hints++; els.hintsUsed.textContent = state.hints;
+  if(level.locked) return;
+  state.hints++; els.hintsUsed.textContent=state.hints;
   const ans=level.answer;
   const hintChar=ans[Math.floor(Math.random()*ans.length)];
   els.feedback.textContent=`Hint: contains "${hintChar}"`; els.feedback.className='feedback hint';
@@ -195,9 +155,15 @@ function hint(){
 function reveal(){
   const level = levels[state.index];
   if(level.locked) return;
-  const ans=level.answer;
-  const unrevealed = ans.split('').map((c,i)=>i===0? c : '_').join('');
-  els.answerInput.value = unrevealed;
+  const ans = level.answer;
+  let current = els.answerInput.value.toUpperCase();
+  for(let i=0;i<ans.length;i++){
+    if(!current[i]){
+      current = current.substr(0,i) + ans[i] + current.substr(i+1);
+      break;
+    }
+  }
+  els.answerInput.value = current;
   els.feedback.textContent='Partial reveal'; els.feedback.className='feedback hint';
 }
 
@@ -207,8 +173,8 @@ function giveUp(){
   level.failed = true;
   els.answerInput.value = level.answer;
   els.answerInput.disabled = true;
-  els.feedback.textContent='You gave up!'; els.feedback.className='feedback err';
-  updateProgress();
+  els.feedback.textContent='You gave up!'; els.feedback.className='feedback hint';
+  updateStats();
 }
 
 // ===== Event Listeners =====
@@ -219,8 +185,8 @@ els.giveUpBtn.addEventListener('click',giveUp);
 els.skipBtn.addEventListener('click',nextLevel);
 els.copyBtn.addEventListener('click',()=>navigator.clipboard.writeText(els.cipherText.textContent));
 els.resetBtn.addEventListener('click',()=>{
-  levels = generateLevels();
-  state = { index:0, attempts:0, hints:0 };
+  levels = generateFunnyWords(5);
+  state.index=0; state.attempts=0; state.hints=0;
   renderLevel();
 });
 els.audioToggle.addEventListener('click',()=>{
@@ -232,15 +198,12 @@ els.audioToggle.addEventListener('click',()=>{
 els.helpBtn.addEventListener('click',()=>els.helpModal.showModal());
 els.helpClose.addEventListener('click',()=>els.helpModal.close());
 els.helpOk.addEventListener('click',()=>els.helpModal.close());
-els.winClose.addEventListener('click',()=>els.winModal.close());
 els.replayBtn.addEventListener('click',()=>{
-  levels = generateLevels();
-  state = { index:0, attempts:0, hints:0 };
-  renderLevel(); els.winModal.close();
+  levels = generateFunnyWords(5);
+  state.index=0; state.attempts=0; state.hints=0;
+  renderLevel();
+  els.winModal.close();
 });
-els.shareBtn.addEventListener('click',()=>navigator.clipboard.writeText(window.location.href));
-
-// Hover tooltip shows instantly
 els.cipherTag.addEventListener('mouseenter',()=>els.cipherTag.title=levels[state.index].type + ': ' + levels[state.index].explanation);
 
 // ===== Init =====
