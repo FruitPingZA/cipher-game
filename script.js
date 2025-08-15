@@ -9,10 +9,10 @@ const els = {
   winModal: document.getElementById('winModal'),
   winClose: document.getElementById('winClose'),
   replayBtn: document.getElementById('replayBtn'),
+  shareBtn: document.getElementById('shareBtn'),
   levelIndicator: document.getElementById('levelIndicator'),
   attempts: document.getElementById('attempts'),
   hintsUsed: document.getElementById('hintsUsed'),
-  score: document.getElementById('score'),
   levelTitle: document.getElementById('levelTitle'),
   cipherText: document.getElementById('cipherText'),
   copyBtn: document.getElementById('copyBtn'),
@@ -26,7 +26,8 @@ const els = {
   progressTrack: document.getElementById('progressTrack'),
   progressDots: document.getElementById('progressDots'),
   cipherTag: document.getElementById('cipherTag'),
-  feedback: document.getElementById('feedback')
+  feedback: document.getElementById('feedback'),
+  score: document.createElement('div')
 };
 
 // ===== Audio =====
@@ -36,45 +37,105 @@ whisper.volume = 0.55;
 const windLoop = new Audio('https://cdn.pixabay.com/audio/2021/08/08/audio_0a50c9f3d2.mp3');
 windLoop.loop = true; windLoop.volume = 0.18;
 
-// ===== Random helpers =====
-function randomWord(length){
-  const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-  let word=''; for(let i=0;i<length;i++) word+=letters[Math.floor(Math.random()*letters.length)];
-  return word;
+// ===== Word list (real words/phrases) =====
+const WORDS = [
+  "HELLO","WORLD","NIGHT","DAWN","CODE","PUZZLE","MYSTERY","SECRET",
+  "ENIGMA","TRUTH","SHADOW","LIGHT","FIRE","WATER","EARTH","AIR",
+  "CIPHER","KEYWORD","SILENCE","WHISPER","DREAM","VISION","SECRET CODE",
+  "MIDNIGHT","RIDDLE","ANSWER","QUESTION","MAGIC","ALPHA","OMEGA","PHOENIX",
+  "DRAGON","TREASURE","ADVENTURE","KNIGHT","CASTLE","SWORD","SHIELD",
+  "QUEST","JOURNEY","LEGEND","MYTH","FABLE","HORIZON","STARRY NIGHT","MOONLIGHT",
+  // ... add hundreds more for variety
+];
+
+// ===== Cipher Functions =====
+function caesarEncrypt(str, shift=3){
+  return str.toUpperCase().replace(/[A-Z]/g, c=>{
+    return String.fromCharCode((c.charCodeAt(0)-65+shift)%26 + 65);
+  });
 }
-function caesarCipher(word,shift){ const letters='ABCDEFGHIJKLMNOPQRSTUVWXYZ'; return word.split('').map(c=>{const idx=letters.indexOf(c.toUpperCase()); return idx===-1?c:letters[(idx+shift)%26];}).join('');}
-function atbashCipher(word){ const letters='ABCDEFGHIJKLMNOPQRSTUVWXYZ'; return word.split('').map(c=>{const idx=letters.indexOf(c.toUpperCase()); return idx===-1?c:letters[25-idx];}).join('');}
-function transpositionCipher(word){return word.split('').sort(()=>Math.random()-0.5).join('');}
-function vigenereCipher(word,key){ const letters='ABCDEFGHIJKLMNOPQRSTUVWXYZ'; return word.split('').map((c,i)=>{ const idx=letters.indexOf(c.toUpperCase()); if(idx===-1) return c; const k=letters.indexOf(key[i%key.length].toUpperCase()); return letters[(idx+k)%26];}).join('');}
-const morseTable={A:'.-',B:'-...',C:'-.-.',D:'-..',E:'.',F:'..-.',G:'--.',H:'....',I:'..',J:'.---',K:'-.-',L:'.-..',M:'--',N:'-.',O:'---',P:'.--.',Q:'--.-',R:'.-.',S:'...',T:'-',U:'..-',V:'...-',W:'.--',X:'-..-',Y:'-.--',Z:'--..'};
-function morseCipher(word){return word.split('').map(c=>morseTable[c.toUpperCase()]||c).join(' ');}
-function generateRandomLevels(count=5){
-  const types=['Caesar','Atbash','Vigenere','Morse','Transposition'];
-  const levels=[];
-  for(let i=0;i<count;i++){
-    const word=randomWord(3+Math.floor(Math.random()*5));
-    const type=types[Math.floor(Math.random()*types.length)];
-    let text,explanation,answer=word;
-    switch(type){
-      case 'Caesar': const shift=1+Math.floor(Math.random()*25); text=caesarCipher(word,shift); explanation=`Each letter is shifted by ${shift} down the alphabet.`; break;
-      case 'Atbash': text=atbashCipher(word); explanation='Each letter is replaced by its reverse in the alphabet (A→Z, B→Y).'; break;
-      case 'Vigenere': const key=randomWord(3+Math.floor(Math.random()*3)); text=vigenereCipher(word,key); explanation=`Each letter is shifted by a keyword (${key}).`; break;
-      case 'Morse': text=morseCipher(word); explanation='Letters represented using dots (.) and dashes (-).'; break;
-      case 'Transposition': text=transpositionCipher(word); explanation='Letters are rearranged according to a random pattern.'; break;
-    }
-    levels.push({cipher:type,type:type,explanation,text,answer,locked:false,failed:false});
+
+function atbashEncrypt(str){
+  return str.toUpperCase().replace(/[A-Z]/g, c=>{
+    return String.fromCharCode(90 - (c.charCodeAt(0)-65));
+  });
+}
+
+function vigenereEncrypt(str, key="KEY"){
+  str=str.toUpperCase(); key=key.toUpperCase();
+  let res=""; let ki=0;
+  for(let c of str){
+    if(c>='A' && c<='Z'){
+      let shift = key[ki%key.length].charCodeAt(0)-65;
+      res += String.fromCharCode((c.charCodeAt(0)-65+shift)%26+65);
+      ki++;
+    } else res+=c;
   }
-  return levels;
+  return res;
+}
+
+function morseEncrypt(str){
+  const MORSE = {
+    'A':'.-','B':'-...','C':'-.-.','D':'-..','E':'.','F':'..-.','G':'--.',
+    'H':'....','I':'..','J':'.---','K':'-.-','L':'.-..','M':'--','N':'-.',
+    'O':'---','P':'.--.','Q':'--.-','R':'.-.','S':'...','T':'-','U':'..-',
+    'V':'...-','W':'.--','X':'-..-','Y':'-.--','Z':'--..',' ':'/'
+  };
+  return str.toUpperCase().split('').map(c=>MORSE[c]||c).join(' ');
+}
+
+function transpositionEncrypt(str){
+  let arr = str.split('');
+  for(let i=0;i<arr.length-1;i+=2){
+    [arr[i],arr[i+1]]=[arr[i+1],arr[i]];
+  }
+  return arr.join('');
+}
+
+// ===== Generate random levels =====
+function generateRandomLevels(count=5){
+  const ciphers = [
+    {cipher:'Caesar', type:'Shift cipher', fn:caesarEncrypt, opts:{shift:3}, explanation:'Each letter is shifted by a fixed number down the alphabet.'},
+    {cipher:'Atbash', type:'Letter substitution', fn:atbashEncrypt, opts:{}, explanation:'Each letter is replaced by its reverse in the alphabet (A→Z, B→Y).'},
+    {cipher:'Vigenère', type:'Keyword cipher', fn:vigenereEncrypt, opts:{key:'KEY'}, explanation:'Uses a keyword to shift letters differently across the message.'},
+    {cipher:'Morse', type:'Dots and dashes', fn:morseEncrypt, opts:{}, explanation:'Represents letters using dots (.) and dashes (-).'},
+    {cipher:'Transposition', type:'Scramble letters', fn:transpositionEncrypt, opts:{}, explanation:'Letters are rearranged according to a fixed pattern.'}
+  ];
+  
+  let selectedWords = [];
+  while(selectedWords.length<count){
+    const w = WORDS[Math.floor(Math.random()*WORDS.length)];
+    if(!selectedWords.includes(w)) selectedWords.push(w);
+  }
+  
+  return selectedWords.map(w=>{
+    const c = ciphers[Math.floor(Math.random()*ciphers.length)];
+    return {
+      cipher: c.cipher,
+      type: c.type,
+      explanation: c.explanation,
+      text: c.fn(w, ...(c.opts.key? [c.opts.key] : [])),
+      answer: w,
+      locked:false,
+      failed:false
+    };
+  });
 }
 
 // ===== State =====
-let levels=generateRandomLevels(5);
-let state={index:0,attempts:0,hints:0,correct:0,failed:0};
+let levels = generateRandomLevels(5);
+let state = {index:0, attempts:0, hints:0, correct:0, failed:0};
 
 // ===== Typewriter effect =====
-function typeWriter(text,callback){
-  els.cipherText.textContent=''; let i=0;
-  function step(){ if(i<text.length){ els.cipherText.textContent+=text[i]; i++; setTimeout(step,70);} else callback&&callback();}
+function typeWriter(text, callback){
+  els.cipherText.textContent='';
+  let i=0;
+  function step(){
+    if(i<text.length){
+      els.cipherText.textContent+=text[i]; i++;
+      setTimeout(step,70);
+    } else callback && callback();
+  }
   step();
 }
 
@@ -86,25 +147,23 @@ function renderLevel(){
   els.cipherTag.title=`${lvl.type}: ${lvl.explanation}`;
   els.attempts.textContent=state.attempts;
   els.hintsUsed.textContent=state.hints;
-  els.score.textContent=`${state.correct} / ${state.failed}`;
-  updateProgress();
+  els.feedback.textContent='';
   typeWriter(lvl.text);
   els.answerInput.value='';
   els.answerInput.disabled=lvl.locked;
   els.submitBtn.disabled=lvl.locked;
+  updateProgress();
 }
 
 // ===== Update progress =====
 function updateProgress(){
-  const pct=(state.index+1)/levels.length;
-  els.progressTrack.style.setProperty('--pct',pct);
   els.progressDots.innerHTML='';
-  for(let i=0;i<levels.length;i++){
+  levels.forEach((lvl,i)=>{
     const dot=document.createElement('div'); dot.classList.add('dot');
     if(i===state.index) dot.classList.add('active');
-    if(levels[i].failed) dot.classList.add('failed');
+    if(lvl.failed) dot.classList.add('failed');
     els.progressDots.appendChild(dot);
-  }
+  });
 }
 
 // ===== Actions =====
@@ -125,12 +184,12 @@ els.submitBtn.addEventListener('click',()=>{
 });
 
 function nextLevel(){
-  if(state.index<levels.length-1){ state.index++; renderLevel(); els.feedback.textContent=''; } 
+  if(state.index<levels.length-1){ state.index++; renderLevel(); } 
   else els.winModal.showModal();
 }
 
 function prevLevel(){
-  if(state.index>0){ state.index--; renderLevel(); els.feedback.textContent=''; }
+  if(state.index>0){ state.index--; renderLevel(); }
 }
 
 function hint(){
@@ -173,13 +232,12 @@ els.skipBtn.addEventListener('click',nextLevel);
 els.copyBtn.addEventListener('click',()=>navigator.clipboard.writeText(els.cipherText.textContent));
 els.resetBtn.addEventListener('click',()=>{
   levels=generateRandomLevels(5);
-  state={index:0,attempts:0,hints:0,correct:0,failed:0};
+  state={index:0, attempts:0, hints:0, correct:0, failed:0};
   renderLevel();
 });
 els.audioToggle.addEventListener('click',()=>{
   audioOn=!audioOn;
   els.audioToggle.textContent=audioOn?'🔊 Audio On':'🔇 Audio Off';
-  els.audioToggle.setAttribute('aria-pressed',audioOn);
   if(audioOn) windLoop.play(); else windLoop.pause();
 });
 els.helpBtn.addEventListener('click',()=>els.helpModal.showModal());
@@ -188,13 +246,13 @@ els.helpOk.addEventListener('click',()=>els.helpModal.close());
 els.winClose.addEventListener('click',()=>els.winModal.close());
 els.replayBtn.addEventListener('click',()=>{
   levels=generateRandomLevels(5);
-  state={index:0,attempts:0,hints:0,correct:0,failed:0};
-  renderLevel();
-  els.winModal.close();
+  state={index:0, attempts:0, hints:0, correct:0, failed:0};
+  renderLevel(); els.winModal.close();
 });
+els.shareBtn.addEventListener('click',()=>navigator.clipboard.writeText(window.location.href));
 
-// Hover shows explanation instantly
-els.cipherTag.addEventListener('mouseenter',()=>{els.cipherTag.title=levels[state.index].type + ': ' + levels[state.index].explanation;});
+// Hover tooltip shows explanation instantly
+els.cipherTag.addEventListener('mouseenter',()=>{els.cipherTag.title=levels[state.index].type+': '+levels[state.index].explanation;});
 
 // ===== Init =====
 renderLevel();
