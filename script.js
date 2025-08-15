@@ -34,8 +34,7 @@ let audioOn = false;
 const whisper = new Audio('https://cdn.pixabay.com/audio/2022/03/15/audio_21cfc88df3.mp3');
 whisper.volume = 0.55;
 const windLoop = new Audio('https://cdn.pixabay.com/audio/2021/08/08/audio_0a50c9f3d2.mp3');
-windLoop.loop = true; 
-windLoop.volume = 0.18;
+windLoop.loop = true; windLoop.volume = 0.18;
 
 // ===== Cipher data =====
 let levels = [
@@ -46,7 +45,7 @@ let levels = [
   {cipher:'Transposition', type:'Scramble letters', explanation:'Letters are rearranged according to a fixed pattern.', text:'OLEHL', answer:'HELLO'}
 ];
 
-// ===== Shuffle levels for new order each session =====
+// ===== Shuffle levels =====
 function shuffleArray(array){
   for(let i=array.length-1;i>0;i--){
     const j=Math.floor(Math.random()*(i+1));
@@ -57,7 +56,7 @@ function shuffleArray(array){
 levels = shuffleArray(levels);
 
 // ===== State =====
-let state = { index:0, attempts:0, hints:0, usedIndexes: new Set(), givenUp: new Set(), correctCount:0 };
+let state = { index:0, attempts:0, hints:0, usedIndexes:new Set(), givenUp:false, failedCount:0 };
 
 // ===== Typewriter effect =====
 function typeWriter(text, callback){
@@ -67,13 +66,13 @@ function typeWriter(text, callback){
     if(i<text.length){
       els.cipherText.textContent+=text[i];
       i++;
-      setTimeout(step, 70);
+      setTimeout(step,70);
     } else callback && callback();
   }
   step();
 }
 
-// ===== Init =====
+// ===== Render Level =====
 function renderLevel(){
   const level = levels[state.index];
   els.levelIndicator.textContent = `${state.index+1} / ${levels.length}`;
@@ -81,19 +80,21 @@ function renderLevel(){
   els.cipherTag.title = `${level.type}: ${level.explanation}`;
   els.attempts.textContent = state.attempts;
   els.hintsUsed.textContent = state.hints;
-  updateProgress();
-  els.answerInput.disabled = state.givenUp.has(state.index);
-  els.submitBtn.disabled = state.givenUp.has(state.index);
+
+  els.answerInput.disabled = state.givenUp;
+  els.submitBtn.disabled = state.givenUp;
+  els.feedback.textContent = '';
   typeWriter(level.text);
+  updateProgress();
 }
 
+// ===== Update Progress =====
 function updateProgress(){
   const pct = (state.index+1)/levels.length;
   els.progressTrack.style.setProperty('--pct', pct);
   els.progressDots.innerHTML='';
   for(let i=0;i<levels.length;i++){
-    const dot = document.createElement('div'); 
-    dot.classList.add('dot');
+    const dot = document.createElement('div'); dot.classList.add('dot');
     if(i===state.index) dot.classList.add('active');
     if(i<state.index) dot.classList.add('done');
     els.progressDots.appendChild(dot);
@@ -102,76 +103,67 @@ function updateProgress(){
 
 // ===== Actions =====
 els.submitBtn.addEventListener('click',()=>{
-  if(state.givenUp.has(state.index)) return; // cannot submit after give up
+  if(state.givenUp) return;
   const answer = els.answerInput.value.trim().toUpperCase();
   const correct = levels[state.index].answer.toUpperCase();
   state.attempts++;
   els.attempts.textContent = state.attempts;
   if(answer===correct){
-    els.feedback.textContent='Correct!';
-    els.feedback.className='feedback ok';
-    state.correctCount++;
+    els.feedback.textContent='Correct!'; els.feedback.className='feedback ok';
     setTimeout(nextLevel,700);
   } else {
-    els.feedback.textContent='Wrong!';
-    els.feedback.className='feedback err';
+    els.feedback.textContent='Wrong!'; els.feedback.className='feedback err';
   }
 });
 
 function nextLevel(){
   if(state.index<levels.length-1){
     state.index++;
-    renderLevel(); 
-    els.answerInput.value=''; 
-    els.feedback.textContent='';
+    state.givenUp = false;
+    renderLevel();
+    els.answerInput.value='';
   } else {
     els.winModal.showModal();
-    els.winModal.querySelector('.modal-body').innerHTML = `<p>Game complete. Correct: ${state.correctCount}/${levels.length}, Failed: ${state.givenUp.size}</p>`;
   }
 }
 
 function prevLevel(){
-  if(state.index>0){ 
-    state.index--; 
-    renderLevel(); 
-    els.answerInput.value=''; 
-    els.feedback.textContent=''; 
+  if(state.index>0){
+    state.index--;
+    state.givenUp = false;
+    renderLevel();
+    els.answerInput.value='';
   }
 }
 
 function hint(){
-  if(state.givenUp.has(state.index)) return;
-  state.hints++; 
-  els.hintsUsed.textContent=state.hints;
-  const ans=levels[state.index].answer;
-  const hintChar=ans[Math.floor(Math.random()*ans.length)];
-  els.feedback.textContent=`Hint: contains "${hintChar}"`; 
-  els.feedback.className='feedback hint';
+  state.hints++; els.hintsUsed.textContent=state.hints;
+  const ans = levels[state.index].answer;
+  const hintChar = ans[Math.floor(Math.random()*ans.length)];
+  els.feedback.textContent=`Hint: contains "${hintChar}"`; els.feedback.className='feedback hint';
   if(audioOn) whisper.play();
 }
 
 function reveal(){
-  if(state.givenUp.has(state.index)) return;
-  const ansArr = levels[state.index].answer.split('');
-  let revealed = Array(ansArr.length).fill('_');
-  const unrevealedIndexes = ansArr.map((_,i)=>i);
-  const revealOne = () => {
-    if(unrevealedIndexes.length===0) return;
-    const idx = unrevealedIndexes.splice(Math.floor(Math.random()*unrevealedIndexes.length),1)[0];
-    revealed[idx] = ansArr[idx];
-    els.answerInput.value = revealed.join('');
-  };
-  revealOne();
-  els.feedback.textContent='Partial reveal'; 
-  els.feedback.className='feedback hint';
+  if(state.givenUp) return;
+  const ans = levels[state.index].answer;
+  const input = els.answerInput.value;
+  for(let i=0;i<ans.length;i++){
+    if(!input[i]){
+      els.answerInput.value = input.slice(0,i) + ans[i] + input.slice(i+1);
+      break;
+    }
+  }
+  els.feedback.textContent='Partial reveal'; els.feedback.className='feedback hint';
 }
 
 function giveUp(){
-  state.givenUp.add(state.index);
+  state.givenUp = true;
+  state.failedCount++;
   els.answerInput.value = levels[state.index].answer;
   els.answerInput.disabled = true;
   els.submitBtn.disabled = true;
-  els.feedback.textContent='You gave up!'; 
+  els.feedback.textContent = `Answer revealed. Failed ${state.failedCount}/${levels.length}`; 
   els.feedback.className='feedback hint';
 }
 
@@ -183,12 +175,12 @@ els.giveUpBtn.addEventListener('click',giveUp);
 els.skipBtn.addEventListener('click',nextLevel);
 els.copyBtn.addEventListener('click',()=>navigator.clipboard.writeText(els.cipherText.textContent));
 els.resetBtn.addEventListener('click',()=>{
-  state.index=0; state.attempts=0; state.hints=0; state.usedIndexes.clear(); state.givenUp.clear(); state.correctCount=0;
+  state.index=0; state.attempts=0; state.hints=0; state.usedIndexes.clear(); state.givenUp=false; state.failedCount=0;
   renderLevel(); els.answerInput.value=''; els.feedback.textContent='';
 });
 els.audioToggle.addEventListener('click',()=>{
-  audioOn=!audioOn;
-  els.audioToggle.textContent=audioOn?'🔊 Audio On':'🔇 Audio Off';
+  audioOn = !audioOn;
+  els.audioToggle.textContent = audioOn?'🔊 Audio On':'🔇 Audio Off';
   els.audioToggle.setAttribute('aria-pressed',audioOn);
   if(audioOn) windLoop.play(); else windLoop.pause();
 });
@@ -197,13 +189,17 @@ els.helpClose.addEventListener('click',()=>els.helpModal.close());
 els.helpOk.addEventListener('click',()=>els.helpModal.close());
 els.winClose.addEventListener('click',()=>els.winModal.close());
 els.replayBtn.addEventListener('click',()=>{
-  state.index=0; state.attempts=0; state.hints=0; state.usedIndexes.clear(); state.givenUp.clear(); state.correctCount=0;
+  state.index=0; state.attempts=0; state.hints=0; state.usedIndexes.clear(); state.givenUp=false; state.failedCount=0;
   renderLevel(); els.winModal.close(); els.answerInput.value=''; els.feedback.textContent='';
 });
 els.shareBtn.addEventListener('click',()=>navigator.clipboard.writeText(window.location.href));
 
-// Hover tooltip instant
-els.cipherTag.addEventListener('mouseenter',()=>els.cipherTag.title=levels[state.index].type + ': ' + levels[state.index].explanation);
+// Hover tooltip shows full explanation instantly
+els.cipherTag.addEventListener('mouseenter',()=>els.cipherTag.title = `${levels[state.index].type}: ${levels[state.index].explanation}`);
+
+// ===== Init =====
+state.usedIndexes.add(state.index);
+renderLevel();
 
 // ===== Fog animation =====
 const fogEl = document.getElementById('fog');
@@ -214,7 +210,3 @@ function animateFog(){
   requestAnimationFrame(animateFog);
 }
 animateFog();
-
-// ===== First Level Render Fix =====
-state.usedIndexes.add(state.index);
-renderLevel(); // ensures first question shows immediately
