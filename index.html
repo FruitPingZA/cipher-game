@@ -4,11 +4,12 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Cipher Nexus — Nightfall Edition</title>
-  <!-- Fonts -->
+  <!-- Fonts: typewriter + serif -->
   <link href="https://fonts.googleapis.com/css2?family=Special+Elite&family=Spectral:wght@400;600;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
+  <!-- Background & effects -->
   <img id="bg-image" alt="" src="https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=1920&q=80" />
   <canvas id="fog" aria-hidden="true"></canvas>
   <div id="vignette" aria-hidden="true"></div>
@@ -46,13 +47,13 @@
         </div>
         <div class="hud-item">
           <span class="hud-label">Correct / Failed</span>
-          <span id="score" class="hud-value">0 / 0</span>
+          <span id="stats" class="hud-value"><span id="correctCount">Correct: 0</span> | <span id="failedCount">Failed: 0</span></span>
         </div>
       </section>
 
       <section class="card flashlight-scope">
         <div class="card-header">
-          <h2 id="levelTitle" class="level-title" title="">Level 1 — Caesar</h2>
+          <h2 id="levelTitle" class="level-title" title="">Level 1 — Cipher</h2>
           <div class="tag" id="cipherTag">Cipher</div>
         </div>
 
@@ -101,7 +102,7 @@
           <li><strong>Reveal:</strong> <em>Reveal One Letter</em> fills a correct character.</li>
           <li><strong>Skip:</strong> You can skip and come back later.</li>
           <li><strong>Previous:</strong> Go back to earlier levels if you want.</li>
-          <li><strong>Give Up:</strong> Reveals the answer and locks the question.</li>
+          <li><strong>Give Up:</strong> Reveals the answer for the current level and locks it.</li>
           <li><strong>Save:</strong> Progress auto-saves in your browser.</li>
         </ul>
       </div>
@@ -116,13 +117,12 @@
     <div class="modal-card">
       <header class="modal-header">
         <h3>All Levels Complete!</h3>
-        <button class="btn ghost close" id="winClose" aria-label="Close">✕</button>
       </header>
       <div class="modal-body">
-        <p>Game over. Check your score and try again.</p>
+        <p>Bravo, codebreaker. Night yields to dawn.</p>
       </div>
       <footer class="modal-footer">
-        <button class="btn primary" id="replayBtn">Restart</button>
+        <button class="btn" id="replayBtn">Restart</button>
       </footer>
     </div>
   </dialog>
