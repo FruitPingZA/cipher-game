@@ -37,7 +37,7 @@ const windLoop = new Audio('https://cdn.pixabay.com/audio/2021/08/08/audio_0a50c
 windLoop.loop = true; windLoop.volume = 0.18;
 
 // ===== Cipher data =====
-let levels = [
+const originalLevels = [
   {cipher:'Caesar', type:'Shift cipher', explanation:'Each letter is shifted by a fixed number down the alphabet.', text:'KHOOR', answer:'HELLO'},
   {cipher:'Atbash', type:'Letter substitution', explanation:'Each letter is replaced by its reverse in the alphabet (A→Z, B→Y).', text:'ZOO', answer:'ALL'},
   {cipher:'Vigenere', type:'Keyword cipher', explanation:'Uses a keyword to shift letters differently across the message.', text:'RIJVS', answer:'HELLO'},
@@ -45,7 +45,7 @@ let levels = [
   {cipher:'Transposition', type:'Scramble letters', explanation:'Letters are rearranged according to a fixed pattern.', text:'OLEHL', answer:'HELLO'}
 ];
 
-// ===== Shuffle levels =====
+// ===== Shuffle helper =====
 function shuffleArray(array){
   for(let i=array.length-1;i>0;i--){
     const j=Math.floor(Math.random()*(i+1));
@@ -53,9 +53,9 @@ function shuffleArray(array){
   }
   return array;
 }
-levels = shuffleArray(levels);
 
 // ===== State =====
+let levels = [];
 let state = { index:0, attempts:0, hints:0, usedIndexes: new Set(), revealed:false };
 
 // ===== Typewriter effect =====
@@ -72,21 +72,33 @@ function typeWriter(text, callback){
   step();
 }
 
-// ===== Init =====
+// ===== Reset / shuffle levels =====
+function resetLevels(){
+  levels = shuffleArray([...originalLevels]); // fresh shuffled copy
+  state.index = 0;
+  state.attempts = 0;
+  state.hints = 0;
+  state.usedIndexes.clear();
+  state.revealed = false;
+  renderLevel();
+  els.answerInput.value = '';
+  els.feedback.textContent = '';
+  els.answerInput.disabled = false;
+}
+
+// ===== Render level =====
 function renderLevel(){
   const level = levels[state.index];
   els.levelIndicator.textContent = `${state.index+1} / ${levels.length}`;
   els.levelTitle.textContent = `Level ${state.index+1} — ${level.cipher}`;
-  els.cipherTag.title = `${level.type}: ${level.explanation}`;
   els.attempts.textContent = state.attempts;
   els.hintsUsed.textContent = state.hints;
-  state.revealed = false;
-  els.answerInput.disabled = false;
-  els.feedback.textContent = '';
+  els.answerInput.disabled = state.revealed;
   updateProgress();
   typeWriter(level.text);
 }
 
+// ===== Progress =====
 function updateProgress(){
   const pct = (state.index+1)/levels.length;
   els.progressTrack.style.setProperty('--pct', pct);
@@ -100,19 +112,17 @@ function updateProgress(){
 }
 
 // ===== Actions =====
-els.submitBtn.addEventListener('click',()=>{
+els.submitBtn.addEventListener('click', ()=>{
   if(state.revealed){
-    els.feedback.textContent = 'Answer already revealed. Use Next/Previous.';
-    els.feedback.className='feedback err';
+    els.feedback.textContent = 'Cannot submit after giving up!'; 
+    els.feedback.className = 'feedback err';
     return;
   }
-
   const answer = els.answerInput.value.trim().toUpperCase();
   const correct = levels[state.index].answer.toUpperCase();
   state.attempts++;
   els.attempts.textContent = state.attempts;
-
-  if(answer===correct){
+  if(answer === correct){
     els.feedback.textContent='Correct!'; els.feedback.className='feedback ok';
     setTimeout(nextLevel,700);
   } else {
@@ -121,10 +131,11 @@ els.submitBtn.addEventListener('click',()=>{
 });
 
 function nextLevel(){
-  if(state.index<levels.length-1){
+  if(state.index < levels.length-1){
     state.index++;
-    while(state.usedIndexes.has(state.index) && state.index<levels.length-1) state.index++;
+    while(state.usedIndexes.has(state.index) && state.index < levels.length-1) state.index++;
     state.usedIndexes.add(state.index);
+    state.revealed = false;
     renderLevel(); 
     els.answerInput.value=''; 
     els.feedback.textContent='';
@@ -134,6 +145,7 @@ function nextLevel(){
 function prevLevel(){
   if(state.index>0){ 
     state.index--; 
+    state.revealed = false;
     renderLevel(); 
     els.answerInput.value=''; 
     els.feedback.textContent=''; 
@@ -142,71 +154,63 @@ function prevLevel(){
 
 function hint(){
   state.hints++; els.hintsUsed.textContent=state.hints;
-  const ans=levels[state.index].answer;
-  const hintChar=ans[Math.floor(Math.random()*ans.length)];
+  const ans = levels[state.index].answer;
+  const hintChar = ans[Math.floor(Math.random()*ans.length)];
   els.feedback.textContent=`Hint: contains "${hintChar}"`; els.feedback.className='feedback hint';
   if(audioOn) whisper.play();
 }
 
 function reveal(){
-  const ans = levels[state.index].answer.toUpperCase();
-  let inputVal = els.answerInput.value.toUpperCase().padEnd(ans.length, '_');
-  
-  // find unrevealed indices
-  let unrevealed = [];
+  const ans = levels[state.index].answer;
+  let inputVal = els.answerInput.value.toUpperCase();
+  // find first unrevealed index
   for(let i=0;i<ans.length;i++){
-    if(inputVal[i] === '_') unrevealed.push(i);
+    if(inputVal[i] !== ans[i]){
+      inputVal = inputVal.substring(0,i) + ans[i] + inputVal.substring(i+1);
+      break;
+    }
   }
-  if(unrevealed.length === 0) return; // all letters already revealed
-
-  const randomIndex = unrevealed[Math.floor(Math.random()*unrevealed.length)];
-  inputVal = inputVal.split('');
-  inputVal[randomIndex] = ans[randomIndex];
-  els.answerInput.value = inputVal.join('');
+  els.answerInput.value = inputVal;
   els.feedback.textContent='Partial reveal'; els.feedback.className='feedback hint';
 }
 
 function giveUp(){
-  const ans = levels[state.index].answer.toUpperCase();
-  els.answerInput.value = ans;
+  els.answerInput.value = levels[state.index].answer;
   els.feedback.textContent='Answer revealed'; els.feedback.className='feedback hint';
   state.revealed = true;
   els.answerInput.disabled = true;
 }
 
 // ===== Event Listeners =====
-els.prevBtn.addEventListener('click',prevLevel);
-els.hintBtn.addEventListener('click',hint);
-els.revealBtn.addEventListener('click',reveal);
-els.giveUpBtn.addEventListener('click',giveUp);
-els.skipBtn.addEventListener('click',nextLevel);
-els.copyBtn.addEventListener('click',()=>navigator.clipboard.writeText(els.cipherText.textContent));
-els.resetBtn.addEventListener('click',()=>{
-  state.index=0; state.attempts=0; state.hints=0; state.usedIndexes.clear(); state.revealed=false;
-  renderLevel(); els.answerInput.value=''; els.feedback.textContent='';
-});
-els.audioToggle.addEventListener('click',()=>{
-  audioOn=!audioOn;
-  els.audioToggle.textContent=audioOn?'🔊 Audio On':'🔇 Audio Off';
+els.prevBtn.addEventListener('click', prevLevel);
+els.hintBtn.addEventListener('click', hint);
+els.revealBtn.addEventListener('click', reveal);
+els.giveUpBtn.addEventListener('click', giveUp);
+els.skipBtn.addEventListener('click', nextLevel);
+els.copyBtn.addEventListener('click', ()=>navigator.clipboard.writeText(els.cipherText.textContent));
+els.resetBtn.addEventListener('click', resetLevels);
+els.audioToggle.addEventListener('click', ()=>{
+  audioOn = !audioOn;
+  els.audioToggle.textContent = audioOn?'🔊 Audio On':'🔇 Audio Off';
   els.audioToggle.setAttribute('aria-pressed',audioOn);
   if(audioOn) windLoop.play(); else windLoop.pause();
 });
-els.helpBtn.addEventListener('click',()=>els.helpModal.showModal());
-els.helpClose.addEventListener('click',()=>els.helpModal.close());
-els.helpOk.addEventListener('click',()=>els.helpModal.close());
-els.winClose.addEventListener('click',()=>els.winModal.close());
-els.replayBtn.addEventListener('click',()=>{
-  state.index=0; state.attempts=0; state.hints=0; state.usedIndexes.clear(); state.revealed=false;
-  renderLevel(); els.winModal.close(); els.answerInput.value=''; els.feedback.textContent='';
-});
-els.shareBtn.addEventListener('click',()=>navigator.clipboard.writeText(window.location.href));
+els.helpBtn.addEventListener('click', ()=>els.helpModal.showModal());
+els.helpClose.addEventListener('click', ()=>els.helpModal.close());
+els.helpOk.addEventListener('click', ()=>els.helpModal.close());
+els.winClose.addEventListener('click', ()=>els.winModal.close());
+els.replayBtn.addEventListener('click', ()=>{ els.winModal.close(); resetLevels(); });
+els.shareBtn.addEventListener('click', ()=>navigator.clipboard.writeText(window.location.href));
 
-// Hover tooltip updates dynamically
-els.cipherTag.addEventListener('mouseenter',()=>els.cipherTag.title=levels[state.index].type + ': ' + levels[state.index].explanation);
+// Hover tooltip shows full explanation
+els.cipherTag.addEventListener('mouseenter', ()=>{
+  const level = levels[state.index];
+  els.cipherTag.title = `${level.type}: ${level.explanation}`;
+});
 
 // ===== Init =====
 state.usedIndexes.add(state.index);
-renderLevel();
+resetLevels();
 
 // ===== Fog animation =====
 const fogEl = document.getElementById('fog');
