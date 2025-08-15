@@ -7,6 +7,9 @@ const els = {
   helpClose: document.getElementById('helpClose'),
   helpOk: document.getElementById('helpOk'),
   winModal: document.getElementById('winModal'),
+  winClose: document.getElementById('winClose'),
+  replayBtn: document.getElementById('replayBtn'),
+  shareBtn: document.getElementById('shareBtn'),
   levelIndicator: document.getElementById('levelIndicator'),
   attempts: document.getElementById('attempts'),
   hintsUsed: document.getElementById('hintsUsed'),
@@ -33,19 +36,19 @@ whisper.volume = 0.55;
 const windLoop = new Audio('https://cdn.pixabay.com/audio/2021/08/08/audio_0a50c9f3d2.mp3');
 windLoop.loop = true; windLoop.volume = 0.18;
 
-// ===== Level generator =====
-function generateLevels(){
-  // You can expand with 1000+ levels here
+// ===== Cipher data =====
+function generateLevels() {
   return [
     {cipher:'Caesar', type:'Shift cipher', explanation:'Each letter is shifted by a fixed number down the alphabet.', text:'KHOOR', answer:'HELLO'},
     {cipher:'Atbash', type:'Letter substitution', explanation:'Each letter is replaced by its reverse in the alphabet (A→Z, B→Y).', text:'ZOO', answer:'ALL'},
     {cipher:'Vigenere', type:'Keyword cipher', explanation:'Uses a keyword to shift letters differently across the message.', text:'RIJVS', answer:'HELLO'},
     {cipher:'Morse', type:'Dots and dashes', explanation:'Represents letters using dots (.) and dashes (-).', text:'.... . .-.. .-.. ---', answer:'HELLO'},
     {cipher:'Transposition', type:'Scramble letters', explanation:'Letters are rearranged according to a fixed pattern.', text:'OLEHL', answer:'HELLO'}
+    // Add more here to expand the pool
   ];
 }
 
-// ===== Shuffle function =====
+// ===== Shuffle levels =====
 function shuffleArray(array){
   for(let i=array.length-1;i>0;i--){
     const j=Math.floor(Math.random()*(i+1));
@@ -56,7 +59,15 @@ function shuffleArray(array){
 
 // ===== State =====
 let levels = shuffleArray(generateLevels());
-let state = { index:0, attempts:0, hints:0, revealed:false, usedIndexes: new Set(), correct:0, failed:0 };
+let state = {
+  index:0,
+  attempts:0,
+  hints:0,
+  correct:0,
+  failed:0,
+  revealed:false,
+  answeredQuestions: new Map() // key: level index, value: 'correct' | 'gaveup'
+};
 
 // ===== Typewriter effect =====
 function typeWriter(text, callback){
@@ -72,34 +83,32 @@ function typeWriter(text, callback){
   step();
 }
 
-// ===== Tooltip update =====
-function updateCipherTooltip(){
-  const level = levels[state.index];
-  els.cipherTag.title = `${level.type}: ${level.explanation}`;
-}
-
 // ===== Render level =====
 function renderLevel(){
   const level = levels[state.index];
   els.levelIndicator.textContent = `${state.index+1} / ${levels.length}`;
   els.levelTitle.textContent = `Level ${state.index+1} — ${level.cipher}`;
+  els.cipherTag.title = `${level.type}: ${level.explanation}`;
   els.attempts.textContent = state.attempts;
   els.hintsUsed.textContent = state.hints;
-
-  // Enable/disable buttons based on revealed
-  els.submitBtn.disabled = state.revealed;
-  els.answerInput.disabled = false;
-
-  // Feedback shows correct / failed count
-  els.feedback.textContent = `Correct: ${state.correct}/${levels.length} | Failed: ${state.failed}/${levels.length}`;
-  els.feedback.className = 'feedback info';
-
   updateProgress();
+  
+  // Reset input if not locked
+  const status = state.answeredQuestions.get(state.index);
+  if(status === 'gaveup' || status === 'correct'){
+    els.answerInput.value = level.answer;
+    els.answerInput.disabled = true;
+    els.submitBtn.disabled = true;
+  } else {
+    els.answerInput.value = '';
+    els.answerInput.disabled = false;
+    els.submitBtn.disabled = false;
+  }
+
+  els.feedback.textContent='';
   typeWriter(level.text);
-  updateCipherTooltip();
 }
 
-// ===== Update progress bar =====
 function updateProgress(){
   const pct = (state.index+1)/levels.length;
   els.progressTrack.style.setProperty('--pct', pct);
@@ -107,39 +116,39 @@ function updateProgress(){
   for(let i=0;i<levels.length;i++){
     const dot = document.createElement('div'); dot.classList.add('dot');
     if(i===state.index) dot.classList.add('active');
-    if(i<state.index) dot.classList.add('done');
+    if(state.answeredQuestions.get(i)==='correct' || state.answeredQuestions.get(i)==='gaveup') dot.classList.add('done');
     els.progressDots.appendChild(dot);
   }
 }
 
 // ===== Actions =====
-els.submitBtn.addEventListener('click',()=>{
-  if(state.revealed){
-    els.feedback.textContent='Cannot submit after giving up!'; 
-    els.feedback.className='feedback err';
-    return;
-  }
+els.submitBtn.addEventListener('click', ()=>{
+  const idx = state.index;
   const answer = els.answerInput.value.trim().toUpperCase();
-  const correct = levels[state.index].answer.toUpperCase();
+  const correct = levels[idx].answer.toUpperCase();
   state.attempts++;
   els.attempts.textContent = state.attempts;
-  if(answer===correct){
+
+  if(answer === correct){
     state.correct++;
+    state.answeredQuestions.set(idx,'correct');
     els.feedback.textContent='Correct!';
     els.feedback.className='feedback ok';
     setTimeout(nextLevel,700);
   } else {
-    state.failed++;
-    els.feedback.textContent=`Wrong! Correct answer: ${correct}`;
+    // wrong attempt: can retry
+    els.feedback.textContent='Wrong! Try again.';
     els.feedback.className='feedback err';
   }
 });
 
 function giveUp(){
-  const ans = levels[state.index].answer;
-  els.answerInput.value = ans;
-  state.revealed = true;
+  const idx = state.index;
+  if(state.answeredQuestions.get(idx)) return; // already given up or correct
+  const ans = levels[idx].answer;
   state.failed++;
+  state.answeredQuestions.set(idx,'gaveup'); // lock
+  els.answerInput.value = ans;
   els.answerInput.disabled = true;
   els.submitBtn.disabled = true;
   els.feedback.textContent = `You gave up! Answer: ${ans} | Correct: ${state.correct}/${levels.length} | Failed: ${state.failed}/${levels.length}`;
@@ -147,79 +156,43 @@ function giveUp(){
 }
 
 function nextLevel(){
-  if(state.index<levels.length-1){
+  if(state.index < levels.length-1){
     state.index++;
-    state.revealed=false;
-    els.answerInput.disabled=false;
-    els.submitBtn.disabled=false;
     renderLevel();
-    els.answerInput.value='';
   } else {
-    els.winModal.innerHTML = `<div style="padding:1em; text-align:center;">
-      <h2>All levels complete!</h2>
-      <p>Correct: ${state.correct}/${levels.length} | Failed: ${state.failed}/${levels.length}</p>
-      <button id="restartBtn">Restart</button>
-    </div>`;
+    // game over
     els.winModal.showModal();
-    document.getElementById('restartBtn').addEventListener('click',()=>{
-      state.index=0; state.correct=0; state.failed=0; state.attempts=0; state.hints=0; state.revealed=false;
-      levels = shuffleArray(generateLevels());
-      renderLevel();
-      els.answerInput.value='';
-      els.submitBtn.disabled=false;
-      els.answerInput.disabled=false;
-      els.winModal.close();
-    });
   }
 }
 
 function prevLevel(){
   if(state.index>0){ 
     state.index--; 
-    state.revealed=false;
-    els.answerInput.disabled=false;
-    els.submitBtn.disabled=false;
     renderLevel(); 
-    els.answerInput.value=''; 
   }
 }
 
-// ===== Hint / Reveal =====
 function hint(){
-  state.hints++; els.hintsUsed.textContent=state.hints;
-  const ans=levels[state.index].answer;
-  const hintChar=ans[Math.floor(Math.random()*ans.length)];
-  els.feedback.textContent=`Hint: contains "${hintChar}"`; els.feedback.className='feedback hint';
+  state.hints++; 
+  els.hintsUsed.textContent = state.hints;
+  const ans = levels[state.index].answer;
+  const hintChar = ans[Math.floor(Math.random()*ans.length)];
+  els.feedback.textContent=`Hint: contains "${hintChar}"`; 
+  els.feedback.className='feedback hint';
   if(audioOn) whisper.play();
-}
-
-function reveal(){
-  const ans=levels[state.index].answer;
-  const chars = els.answerInput.value.toUpperCase().split('');
-  for(let i=0;i<ans.length;i++){
-    if(!chars[i] || chars[i]!==ans[i]){
-      chars[i] = ans[i];
-      break; // reveal only one letter
-    }
-  }
-  els.answerInput.value = chars.join('');
-  els.feedback.textContent='Partial reveal'; els.feedback.className='feedback hint';
 }
 
 // ===== Event Listeners =====
 els.prevBtn.addEventListener('click',prevLevel);
 els.hintBtn.addEventListener('click',hint);
-els.revealBtn.addEventListener('click',reveal);
+els.revealBtn.addEventListener('click',()=>giveUp()); // optional: reveal as give up
 els.giveUpBtn.addEventListener('click',giveUp);
 els.skipBtn.addEventListener('click',nextLevel);
 els.copyBtn.addEventListener('click',()=>navigator.clipboard.writeText(els.cipherText.textContent));
-els.resetBtn.addEventListener('click',()=>{
-  state.index=0; state.attempts=0; state.hints=0; state.usedIndexes.clear();
-  state.correct=0; state.failed=0; state.revealed=false;
-  levels = shuffleArray(generateLevels());
-  renderLevel(); 
-  els.answerInput.value=''; 
-  els.feedback.textContent='';
+els.resetBtn.addEventListener('click', ()=>{
+  state.index=0; state.attempts=0; state.hints=0; state.correct=0; state.failed=0; state.revealed=false;
+  state.answeredQuestions.clear();
+  renderLevel();
 });
 els.audioToggle.addEventListener('click',()=>{
   audioOn=!audioOn;
@@ -230,12 +203,21 @@ els.audioToggle.addEventListener('click',()=>{
 els.helpBtn.addEventListener('click',()=>els.helpModal.showModal());
 els.helpClose.addEventListener('click',()=>els.helpModal.close());
 els.helpOk.addEventListener('click',()=>els.helpModal.close());
+els.winClose.addEventListener('click',()=>els.winModal.close());
+els.replayBtn.addEventListener('click',()=>{
+  state.index=0; state.attempts=0; state.hints=0; state.correct=0; state.failed=0; state.revealed=false;
+  state.answeredQuestions.clear();
+  renderLevel(); els.winModal.close();
+});
+els.shareBtn.addEventListener('click',()=>navigator.clipboard.writeText(window.location.href));
 
-// Hover tooltip shows full explanation
-els.cipherTag.addEventListener('mouseenter',updateCipherTooltip);
+// Hover tooltip shows explanation instantly
+els.cipherTag.addEventListener('mouseenter', ()=>{
+  const level = levels[state.index];
+  els.cipherTag.title = `${level.type}: ${level.explanation}`;
+});
 
 // ===== Init =====
-state.usedIndexes.add(state.index);
 renderLevel();
 
 // ===== Fog animation =====
