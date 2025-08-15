@@ -45,7 +45,7 @@ let levels = [
   {cipher:'Transposition', type:'Scramble letters', explanation:'Letters are rearranged according to a fixed pattern.', text:'OLEHL', answer:'HELLO'}
 ];
 
-// ===== Shuffle levels =====
+// ===== Shuffle levels to start differently each session =====
 function shuffleArray(array){
   for(let i=array.length-1;i>0;i--){
     const j=Math.floor(Math.random()*(i+1));
@@ -56,7 +56,7 @@ function shuffleArray(array){
 levels = shuffleArray(levels);
 
 // ===== State =====
-let state = { index:0, attempts:0, hints:0, usedIndexes:new Set(), givenUp:false, failedCount:0 };
+let state = { index:0, attempts:0, hints:0, usedIndexes: new Set(), givenUp: new Set() };
 
 // ===== Typewriter effect =====
 function typeWriter(text, callback){
@@ -66,13 +66,13 @@ function typeWriter(text, callback){
     if(i<text.length){
       els.cipherText.textContent+=text[i];
       i++;
-      setTimeout(step,70);
+      setTimeout(step, 70);
     } else callback && callback();
   }
   step();
 }
 
-// ===== Render Level =====
+// ===== Init =====
 function renderLevel(){
   const level = levels[state.index];
   els.levelIndicator.textContent = `${state.index+1} / ${levels.length}`;
@@ -80,15 +80,25 @@ function renderLevel(){
   els.cipherTag.title = `${level.type}: ${level.explanation}`;
   els.attempts.textContent = state.attempts;
   els.hintsUsed.textContent = state.hints;
-
-  els.answerInput.disabled = state.givenUp;
-  els.submitBtn.disabled = state.givenUp;
-  els.feedback.textContent = '';
-  typeWriter(level.text);
   updateProgress();
+
+  // Disable input if question was given up
+  if(state.givenUp.has(state.index)){
+    els.answerInput.value = level.answer;
+    els.answerInput.disabled = true;
+    els.submitBtn.disabled = true;
+    els.feedback.textContent = 'You gave up on this question';
+    els.feedback.className='feedback err';
+  } else {
+    els.answerInput.disabled = false;
+    els.submitBtn.disabled = false;
+    typeWriter(level.text);
+    els.answerInput.value='';
+    els.feedback.textContent='';
+    els.feedback.className='feedback';
+  }
 }
 
-// ===== Update Progress =====
 function updateProgress(){
   const pct = (state.index+1)/levels.length;
   els.progressTrack.style.setProperty('--pct', pct);
@@ -103,7 +113,7 @@ function updateProgress(){
 
 // ===== Actions =====
 els.submitBtn.addEventListener('click',()=>{
-  if(state.givenUp) return;
+  if(state.givenUp.has(state.index)) return; // cannot submit if given up
   const answer = els.answerInput.value.trim().toUpperCase();
   const correct = levels[state.index].answer.toUpperCase();
   state.attempts++;
@@ -119,9 +129,7 @@ els.submitBtn.addEventListener('click',()=>{
 function nextLevel(){
   if(state.index<levels.length-1){
     state.index++;
-    state.givenUp = false;
     renderLevel();
-    els.answerInput.value='';
   } else {
     els.winModal.showModal();
   }
@@ -130,41 +138,40 @@ function nextLevel(){
 function prevLevel(){
   if(state.index>0){
     state.index--;
-    state.givenUp = false;
     renderLevel();
-    els.answerInput.value='';
   }
 }
 
 function hint(){
   state.hints++; els.hintsUsed.textContent=state.hints;
-  const ans = levels[state.index].answer;
-  const hintChar = ans[Math.floor(Math.random()*ans.length)];
+  const ans=levels[state.index].answer;
+  const hintChar=ans[Math.floor(Math.random()*ans.length)];
   els.feedback.textContent=`Hint: contains "${hintChar}"`; els.feedback.className='feedback hint';
   if(audioOn) whisper.play();
 }
 
 function reveal(){
-  if(state.givenUp) return;
-  const ans = levels[state.index].answer;
-  const input = els.answerInput.value;
-  for(let i=0;i<ans.length;i++){
-    if(!input[i]){
-      els.answerInput.value = input.slice(0,i) + ans[i] + input.slice(i+1);
-      break;
+  if(!state.givenUp.has(state.index)){
+    const ans=levels[state.index].answer;
+    const current = els.answerInput.value;
+    // Reveal only one unrevealed letter
+    let revealIndex = -1;
+    for(let i=0;i<ans.length;i++){
+      if(current[i]!==ans[i]){
+        revealIndex=i; break;
+      }
     }
+    if(revealIndex>=0){
+      els.answerInput.value=current.substring(0,revealIndex)+ans[revealIndex]+current.substring(revealIndex+1);
+      els.feedback.textContent='Partial reveal'; els.feedback.className='feedback hint';
+    }
+    if(audioOn) whisper.play();
   }
-  els.feedback.textContent='Partial reveal'; els.feedback.className='feedback hint';
 }
 
 function giveUp(){
-  state.givenUp = true;
-  state.failedCount++;
-  els.answerInput.value = levels[state.index].answer;
-  els.answerInput.disabled = true;
-  els.submitBtn.disabled = true;
-  els.feedback.textContent = `Answer revealed. Failed ${state.failedCount}/${levels.length}`; 
-  els.feedback.className='feedback hint';
+  state.givenUp.add(state.index);
+  renderLevel();
 }
 
 // ===== Event Listeners =====
@@ -175,12 +182,12 @@ els.giveUpBtn.addEventListener('click',giveUp);
 els.skipBtn.addEventListener('click',nextLevel);
 els.copyBtn.addEventListener('click',()=>navigator.clipboard.writeText(els.cipherText.textContent));
 els.resetBtn.addEventListener('click',()=>{
-  state.index=0; state.attempts=0; state.hints=0; state.usedIndexes.clear(); state.givenUp=false; state.failedCount=0;
-  renderLevel(); els.answerInput.value=''; els.feedback.textContent='';
+  state.index=0; state.attempts=0; state.hints=0; state.usedIndexes.clear(); state.givenUp.clear();
+  renderLevel();
 });
 els.audioToggle.addEventListener('click',()=>{
-  audioOn = !audioOn;
-  els.audioToggle.textContent = audioOn?'🔊 Audio On':'🔇 Audio Off';
+  audioOn=!audioOn;
+  els.audioToggle.textContent=audioOn?'🔊 Audio On':'🔇 Audio Off';
   els.audioToggle.setAttribute('aria-pressed',audioOn);
   if(audioOn) windLoop.play(); else windLoop.pause();
 });
@@ -189,16 +196,15 @@ els.helpClose.addEventListener('click',()=>els.helpModal.close());
 els.helpOk.addEventListener('click',()=>els.helpModal.close());
 els.winClose.addEventListener('click',()=>els.winModal.close());
 els.replayBtn.addEventListener('click',()=>{
-  state.index=0; state.attempts=0; state.hints=0; state.usedIndexes.clear(); state.givenUp=false; state.failedCount=0;
-  renderLevel(); els.winModal.close(); els.answerInput.value=''; els.feedback.textContent='';
+  state.index=0; state.attempts=0; state.hints=0; state.usedIndexes.clear(); state.givenUp.clear();
+  renderLevel(); els.winModal.close();
 });
 els.shareBtn.addEventListener('click',()=>navigator.clipboard.writeText(window.location.href));
 
 // Hover tooltip shows full explanation instantly
-els.cipherTag.addEventListener('mouseenter',()=>els.cipherTag.title = `${levels[state.index].type}: ${levels[state.index].explanation}`);
+els.cipherTag.addEventListener('mouseenter',()=>els.cipherTag.title=levels[state.index].type + ': ' + levels[state.index].explanation);
 
 // ===== Init =====
-state.usedIndexes.add(state.index);
 renderLevel();
 
 // ===== Fog animation =====
